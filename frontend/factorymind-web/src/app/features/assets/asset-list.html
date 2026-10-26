@@ -3,10 +3,12 @@
     <h1>Machines</h1>
     <p class="subtitle">Every registered asset with its line, criticality and current status.</p>
   </div>
-  <a mat-flat-button routerLink="/assets/new">
-    <mat-icon>add</mat-icon>
-    New machine
-  </a>
+  @if (auth.hasAnyRole('ADMIN', 'ENGINEER')) {
+    <a mat-flat-button routerLink="/assets/new">
+      <mat-icon>add</mat-icon>
+      New machine
+    </a>
+  }
 </header>
 
 <form class="filters" [formGroup]="filters">

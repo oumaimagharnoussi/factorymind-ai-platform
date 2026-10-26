@@ -12,6 +12,7 @@ import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { debounceTime } from 'rxjs';
 import { AssetApi } from '../../core/api/asset-api';
+import { Auth } from '../../core/auth/auth';
 import { ASSET_STATUSES, AssetQuery, AssetStatus, CRITICALITIES, Criticality } from '../../core/api/models';
 import { StatusChip } from '../../shared/status-chip';
 
@@ -35,6 +36,7 @@ import { StatusChip } from '../../shared/status-chip';
 })
 export class AssetList {
   private readonly api = inject(AssetApi);
+  protected readonly auth = inject(Auth);
 
   protected readonly statuses = ASSET_STATUSES;
   protected readonly criticalities = CRITICALITIES;

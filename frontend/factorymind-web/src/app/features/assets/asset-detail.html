@@ -109,7 +109,7 @@
           <button mat-flat-button type="submit" [disabled]="saving()">Add</button>
           <button mat-button type="button" (click)="showSensorForm.set(false)">Cancel</button>
         </form>
-      } @else {
+      } @else if (auth.hasAnyRole('ADMIN', 'ENGINEER')) {
         <button mat-stroked-button class="add-sensor" (click)="showSensorForm.set(true)">
           <mat-icon>add</mat-icon>
           Add sensor

@@ -1,5 +1,6 @@
 package com.factorymind.asset;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -14,6 +15,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -32,6 +35,9 @@ class AssetApiIntegrationTest {
     @Autowired
     MockMvc mvc;
 
+    /** A signed-in Keycloak admin; the role rules themselves are covered by AccessRulesTest. */
+    private final JwtRequestPostProcessor admin = jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+
     @Test
     void machineLifecycle() throws Exception {
         String factoryId = createAndGetId("/api/factories", """
@@ -45,46 +51,46 @@ class AssetApiIntegrationTest {
                 """.formatted(lineId));
 
         // Same code with different case is still a duplicate.
-        mvc.perform(post("/api/assets").contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/api/assets").with(admin).contentType(MediaType.APPLICATION_JSON).content("""
                         {"assetCode": "T-001", "name": "Copy", "lineId": "%s", "criticality": "LOW"}
                         """.formatted(lineId)))
                 .andExpect(status().isConflict());
 
-        mvc.perform(post("/api/assets/{id}/sensors", assetId).contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/api/assets/{id}/sensors", assetId).with(admin).contentType(MediaType.APPLICATION_JSON).content("""
                         {"sensorType": "VIBRATION", "unit": "mm/s", "warningThreshold": 4.5, "criticalThreshold": 7.1}
                         """))
                 .andExpect(status().isCreated());
-        mvc.perform(post("/api/assets/{id}/sensors", assetId).contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/api/assets/{id}/sensors", assetId).with(admin).contentType(MediaType.APPLICATION_JSON).content("""
                         {"sensorType": "TEMPERATURE", "unit": "C", "warningThreshold": 95, "criticalThreshold": 80}
                         """))
                 .andExpect(status().isUnprocessableContent());
 
-        mvc.perform(patch("/api/assets/{id}/status", assetId).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(patch("/api/assets/{id}/status", assetId).with(admin).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\": \"WARNING\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("WARNING"));
 
-        mvc.perform(get("/api/assets").param("status", "WARNING").param("q", "motor"))
+        mvc.perform(get("/api/assets").with(admin).param("status", "WARNING").param("q", "motor"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].assetCode").value("T-001"))
                 .andExpect(jsonPath("$.content[0].factoryName").value("Test Plant"));
 
-        mvc.perform(get("/api/assets/summary"))
+        mvc.perform(get("/api/assets/summary").with(admin))
                 .andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.byStatus.WARNING").value(1))
                 .andExpect(jsonPath("$.byStatus.OPERATIONAL").value(0));
 
         // A line that still holds machines cannot be deleted.
-        mvc.perform(delete("/api/production-lines/{id}", lineId)).andExpect(status().isConflict());
+        mvc.perform(delete("/api/production-lines/{id}", lineId).with(admin)).andExpect(status().isConflict());
 
-        mvc.perform(delete("/api/assets/{id}", assetId)).andExpect(status().isNoContent());
-        mvc.perform(delete("/api/production-lines/{id}", lineId)).andExpect(status().isNoContent());
-        mvc.perform(delete("/api/factories/{id}", factoryId)).andExpect(status().isNoContent());
+        mvc.perform(delete("/api/assets/{id}", assetId).with(admin)).andExpect(status().isNoContent());
+        mvc.perform(delete("/api/production-lines/{id}", lineId).with(admin)).andExpect(status().isNoContent());
+        mvc.perform(delete("/api/factories/{id}", factoryId).with(admin)).andExpect(status().isNoContent());
     }
 
     private String createAndGetId(String url, String body) throws Exception {
-        String json = mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(body))
+        String json = mvc.perform(post(url).with(admin).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(json, "$.id");

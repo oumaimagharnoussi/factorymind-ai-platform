@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: asset-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Must equal the "iss" claim of the tokens the browser gets from Keycloak.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/auth/realms/factorymind}
+          # Signing keys; inside Docker this goes to keycloak:8080 while the issuer stays the public URL.
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/auth/realms/factorymind/protocol/openid-connect/certs}
   datasource:
     url: ${ASSET_DB_URL:jdbc:postgresql://localhost:5432/asset_db}
     username: ${ASSET_DB_USER:factorymind}

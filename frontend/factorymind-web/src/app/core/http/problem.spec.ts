@@ -18,4 +18,8 @@ describe('describeError', () => {
   it('explains when the gateway is unreachable', () => {
     expect(describeError(new HttpErrorResponse({ status: 0 }))).toContain('cannot be reached');
   });
+
+  it('explains a missing permission', () => {
+    expect(describeError(new HttpErrorResponse({ status: 403 }))).toBe('Your role does not allow this action.');
+  });
 });

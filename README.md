@@ -9,7 +9,7 @@ a Python ML service and Power BI analytics.
 
 ![Dashboard](docs/demo/dashboard.png)
 
-## What works today (phase 1)
+## What works today (phases 1–2)
 
 | Area | Status |
 |---|---|
@@ -19,22 +19,50 @@ a Python ML service and Power BI analytics.
 | Angular dashboard, machine list, machine details, new machine form, factories | ✅ |
 | Flyway migrations, demo data, RFC 9457 error responses, optimistic locking | ✅ |
 | Unit, web-slice and Testcontainers integration tests, GitHub Actions CI | ✅ |
+| Keycloak login (OIDC + PKCE), JWT validation in the gateway and the asset service, ADMIN / ENGINEER / OPERATOR roles | ✅ |
 | Sensor simulator, Kafka, telemetry, live charts | Weeks 5–7 |
 | Work orders, preventive plans, spare parts | Weeks 8–9 |
 | Anomaly detection and failure-risk model (Python, scikit-learn) | Weeks 10–11 |
 | Maintenance copilot (Spring AI + RAG), Power BI reports | Weeks 12–13 |
-| Keycloak / OAuth2 roles, observability | Weeks 3–4, 14–15 |
+| Observability (Prometheus, Grafana) | Weeks 14–15 |
 
 ## Architecture
 
 ```
-Angular (4200) ──► API Gateway (8080) ──► asset-service (8081) ──► PostgreSQL asset_db
-                         │
-                         └──► (next) telemetry, maintenance, inventory, alert, ai-insights
+                 login (PKCE)
+Angular (4200) ─────────────────► Keycloak (8180/auth, realm factorymind)
+      │ Bearer token                    ▲ signing keys (JWKS)
+      ▼                                 │
+API Gateway (8080) ──► asset-service (8081) ──► PostgreSQL asset_db
+      │
+      └──► (next) telemetry, maintenance, inventory, alert, ai-insights
 ```
 
 Each service owns its database; services talk over REST for queries and Kafka for events (from phase 2).
 Decisions are recorded in [`docs/adr`](docs/adr).
+
+## Security
+
+Keycloak issues the tokens; the Angular app signs in with the authorization code flow and PKCE (`keycloak-js`)
+and sends the access token to `/api`. The gateway rejects any call without a valid token and a FactoryMind role,
+then forwards the token; the asset service checks it again and applies the role rules:
+
+| Role | Can do |
+|---|---|
+| OPERATOR | Read factories, lines, machines and sensors; report a machine's status |
+| ENGINEER | Everything an operator does, plus create and edit machines and sensor limits |
+| ADMIN | Everything, including factories, production lines and deletes |
+
+Demo accounts (realm import in `infrastructure/keycloak/factorymind-realm.json`; change them before any real use):
+
+| User | Password | Role |
+|---|---|---|
+| `admin` | `admin` | ADMIN |
+| `engineer` | `engineer` | ENGINEER |
+| `operator` | `operator` | OPERATOR |
+
+Keycloak admin console: http://localhost:8180/auth/admin (`KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`, default
+`admin` / `admin`). See [ADR 0002](docs/adr/0002-keycloak-security.md).
 
 ## Tech stack
 
@@ -54,12 +82,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Open http://localhost:4200. Swagger UI for the asset service: http://localhost:8081/swagger-ui.html
+Open http://localhost:4200 and sign in with one of the demo accounts. Swagger UI for the asset service:
+http://localhost:8081/swagger-ui.html
 
 ### For development
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres keycloak
 
 # Backend (JDK 25; with JDK 21 add -Djava.version=21)
 cd backend
@@ -75,6 +104,9 @@ npm start                                 # proxies /api to the gateway on :8080
 Start with an empty database instead of the demo data:
 `FLYWAY_LOCATIONS=classpath:db/migration`.
 
+Signed-in call from a terminal: the web client has no password grant, so take the token from the browser
+(DevTools > Network > any `/api` call > `Authorization` header) and pass it as `-H "Authorization: Bearer <token>"`.
+
 ### Tests
 
 ```bash
@@ -84,7 +116,9 @@ cd frontend/factorymind-web && npx ng test --watch=false
 
 ## Deploy
 
-`docker-compose.prod.yml` runs the published images behind Caddy (automatic HTTPS). `.github/workflows/deploy.yml`
+`docker-compose.prod.yml` runs the published images behind Caddy (automatic HTTPS), with Keycloak at
+`https://$DOMAIN/auth` stored in `keycloak_db`. On a server whose Postgres volume already exists, create that
+database once: `docker compose -f docker-compose.prod.yml exec postgres createdb -U $POSTGRES_USER keycloak_db`. `.github/workflows/deploy.yml`
 tests, builds and pushes the images to GHCR on every push to `main`, then updates the server over SSH once the
 `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY` secrets and the `DEPLOY_ENABLED=true` variable are set.
 
@@ -116,6 +150,6 @@ backend/          Maven multi-module: asset-service, api-gateway (more services 
 frontend/         Angular app (factorymind-web)
 ai/               Python ML services (phase 3)
 analytics/        Warehouse, ETL and Power BI (phase 4)
-infrastructure/   Database init scripts, later Kafka, Keycloak, Prometheus, Grafana
+infrastructure/   Database init scripts, Keycloak realm, Caddy; later Kafka, Prometheus, Grafana
 docs/             ADRs, architecture notes, screenshots
 ```

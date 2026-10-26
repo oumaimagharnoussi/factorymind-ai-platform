@@ -13,6 +13,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { AssetApi } from '../../core/api/asset-api';
+import { Auth } from '../../core/auth/auth';
 import { ASSET_STATUSES, AssetStatus, SENSOR_TYPES, SensorType } from '../../core/api/models';
 import { StatusChip } from '../../shared/status-chip';
 
@@ -45,6 +46,7 @@ const DEFAULT_UNITS: Record<SensorType, string> = {
 })
 export class AssetDetail {
   private readonly api = inject(AssetApi);
+  protected readonly auth = inject(Auth);
 
   /** Bound from the :id route parameter (withComponentInputBinding). */
   readonly id = input.required<string>();

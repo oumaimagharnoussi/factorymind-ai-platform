@@ -61,6 +61,18 @@
   color: var(--fm-warn);
 }
 
+.user {
+  margin-left: 12px;
+}
+
+.role {
+  margin-left: 6px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--fm-border);
+}
+
 .content {
   padding: 24px;
   max-width: 1280px;

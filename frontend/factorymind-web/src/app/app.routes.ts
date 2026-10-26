@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { roleGuard } from './core/auth/role.guard';
 import { Shell } from './core/layout/shell';
 
 const soon = (title: string, phase: string, description: string) => ({
@@ -31,6 +32,7 @@ export const routes: Routes = [
       {
         path: 'assets/new',
         title: 'New machine · FactoryMind AI',
+        canActivate: [roleGuard('ADMIN', 'ENGINEER')],
         loadComponent: () => import('./features/assets/asset-form').then((m) => m.AssetForm),
       },
       {

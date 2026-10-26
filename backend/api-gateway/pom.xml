@@ -12,7 +12,7 @@
 
     <artifactId>api-gateway</artifactId>
     <name>FactoryMind AI :: API Gateway</name>
-    <description>Single entry point for the Angular app: routing, CORS and (later) token validation</description>
+    <description>Single entry point for the Angular app: routing, CORS and Keycloak token validation</description>
 
     <dependencies>
         <dependency>
@@ -23,10 +23,19 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

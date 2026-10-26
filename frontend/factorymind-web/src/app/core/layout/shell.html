@@ -25,6 +25,21 @@
       <span>Smart Industrial Operations</span>
       <span class="spacer"></span>
       <span class="demo-badge">Demo data</span>
+      @if (auth.user(); as user) {
+        <button mat-button class="user" [matMenuTriggerFor]="userMenu">
+          <mat-icon>account_circle</mat-icon>
+          {{ user.name }}
+          @for (role of user.roles; track role) {
+            <span class="role">{{ role }}</span>
+          }
+        </button>
+        <mat-menu #userMenu="matMenu" xPosition="before">
+          <button mat-menu-item (click)="auth.logout()">
+            <mat-icon>logout</mat-icon>
+            Sign out
+          </button>
+        </mat-menu>
+      }
     </mat-toolbar>
     <main class="content">
       <router-outlet />

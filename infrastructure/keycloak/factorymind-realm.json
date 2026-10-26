@@ -1,0 +1,71 @@
+{
+  "realm": "factorymind",
+  "displayName": "FactoryMind AI",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "roles": {
+    "realm": [
+      { "name": "ADMIN", "description": "Manages factories, production lines, machines and users" },
+      { "name": "ENGINEER", "description": "Registers machines, sensors and alarm limits" },
+      { "name": "OPERATOR", "description": "Reads the plant and reports machine status" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "factorymind-web",
+      "name": "FactoryMind web app",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "${WEB_ORIGIN:http://localhost:4200}",
+      "baseUrl": "/",
+      "redirectUris": ["/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@factorymind.local",
+      "firstName": "Amira",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "engineer",
+      "email": "engineer@factorymind.local",
+      "firstName": "Elias",
+      "lastName": "Engineer",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "engineer", "temporary": false }],
+      "realmRoles": ["ENGINEER"]
+    },
+    {
+      "username": "operator",
+      "email": "operator@factorymind.local",
+      "firstName": "Omar",
+      "lastName": "Operator",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "operator", "temporary": false }],
+      "realmRoles": ["OPERATOR"]
+    }
+  ]
+}
