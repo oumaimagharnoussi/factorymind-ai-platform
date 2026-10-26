@@ -1,0 +1,120 @@
+<a mat-button routerLink="/assets" class="back">
+  <mat-icon>arrow_back</mat-icon>
+  Machines
+</a>
+
+@if (asset.isLoading() && !asset.hasValue()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+@if (asset.error()) {
+  <div class="error-banner" role="alert">This machine could not be loaded.</div>
+}
+
+@if (asset.value(); as a) {
+  <header class="page-header">
+    <div>
+      <h1>{{ a.assetCode }} · {{ a.name }}</h1>
+      <p class="subtitle">{{ a.factoryName }} › {{ a.lineName }}</p>
+    </div>
+    <div class="actions">
+      <app-status-chip [value]="a.status" />
+      <button mat-stroked-button [matMenuTriggerFor]="statusMenu">Change status</button>
+      <mat-menu #statusMenu="matMenu">
+        @for (s of statuses; track s) {
+          <button mat-menu-item [disabled]="s === a.status" (click)="changeStatus(s)">{{ s }}</button>
+        }
+      </mat-menu>
+    </div>
+  </header>
+
+  <section class="grid">
+    <mat-card>
+      <mat-card-header><mat-card-title>Identity</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <dl class="facts">
+          <dt>Manufacturer</dt>
+          <dd>{{ a.manufacturer || '—' }}</dd>
+          <dt>Model</dt>
+          <dd>{{ a.model || '—' }}</dd>
+          <dt>Installed</dt>
+          <dd>{{ a.installedAt ? (a.installedAt | date: 'mediumDate') : '—' }}</dd>
+          <dt>Criticality</dt>
+          <dd><app-status-chip [value]="a.criticality" /></dd>
+          <dt>Last update</dt>
+          <dd>{{ a.updatedAt | date: 'medium' }}</dd>
+        </dl>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="placeholder-card">
+      <mat-card-header><mat-card-title>Live readings</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <p>Temperature and vibration charts arrive with the telemetry service and Kafka (weeks 5–7).</p>
+      </mat-card-content>
+    </mat-card>
+  </section>
+
+  <mat-card class="sensors">
+    <mat-card-header>
+      <mat-card-title>Sensors and alarm limits</mat-card-title>
+      <mat-card-subtitle>The alert service will compare each reading with these thresholds.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <table mat-table [dataSource]="sensors.value() ?? []">
+        <ng-container matColumnDef="sensorType">
+          <th mat-header-cell *matHeaderCellDef>Sensor</th>
+          <td mat-cell *matCellDef="let s">{{ s.sensorType }}</td>
+        </ng-container>
+        <ng-container matColumnDef="unit">
+          <th mat-header-cell *matHeaderCellDef>Unit</th>
+          <td mat-cell *matCellDef="let s">{{ s.unit }}</td>
+        </ng-container>
+        <ng-container matColumnDef="warningThreshold">
+          <th mat-header-cell *matHeaderCellDef>Warning above</th>
+          <td mat-cell *matCellDef="let s">{{ s.warningThreshold }}</td>
+        </ng-container>
+        <ng-container matColumnDef="criticalThreshold">
+          <th mat-header-cell *matHeaderCellDef>Critical above</th>
+          <td mat-cell *matCellDef="let s">{{ s.criticalThreshold }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="sensorColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: sensorColumns"></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="empty" [attr.colspan]="sensorColumns.length">No sensor defined yet.</td>
+        </tr>
+      </table>
+
+      @if (showSensorForm()) {
+        <form class="sensor-form" [formGroup]="sensorForm" (ngSubmit)="addSensor()">
+          <mat-form-field appearance="outline">
+            <mat-label>Sensor</mat-label>
+            <mat-select formControlName="sensorType">
+              @for (t of sensorTypes; track t) {
+                <mat-option [value]="t">{{ t }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Unit</mat-label>
+            <input matInput formControlName="unit" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Warning above</mat-label>
+            <input matInput type="number" formControlName="warningThreshold" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Critical above</mat-label>
+            <input matInput type="number" formControlName="criticalThreshold" />
+          </mat-form-field>
+          <button mat-flat-button type="submit" [disabled]="saving()">Add</button>
+          <button mat-button type="button" (click)="showSensorForm.set(false)">Cancel</button>
+        </form>
+      } @else {
+        <button mat-stroked-button class="add-sensor" (click)="showSensorForm.set(true)">
+          <mat-icon>add</mat-icon>
+          Add sensor
+        </button>
+      }
+    </mat-card-content>
+  </mat-card>
+}

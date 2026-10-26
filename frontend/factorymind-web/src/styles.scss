@@ -1,0 +1,81 @@
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: light;
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$orange-palette,
+    ),
+    typography: Inter,
+    density: 0,
+  ));
+}
+
+:root {
+  --fm-bg: #f4f6f9;
+  --fm-surface: #ffffff;
+  --fm-border: #e3e7ee;
+  --fm-hover: #f0f4fa;
+  --fm-text-muted: #5d6675;
+  --fm-accent: #1f7ae0;
+  --fm-nav-bg: #111827;
+  --fm-nav-fg: #e5e7eb;
+  --fm-nav-fg-muted: #9ca3af;
+
+  --fm-ok: #17803d;
+  --fm-ok-bg: #e3f6e9;
+  --fm-warn: #a85b00;
+  --fm-warn-bg: #fff1dc;
+  --fm-bad: #c0262d;
+  --fm-bad-bg: #fde6e7;
+  --fm-info: #1d5fbf;
+  --fm-info-bg: #e2edfc;
+  --fm-muted: #5d6675;
+  --fm-muted-bg: #eceff3;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--fm-bg);
+  font-family: Inter, 'Segoe UI', Roboto, sans-serif;
+}
+
+h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--fm-text-muted);
+}
+
+.table-card {
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  border-radius: 12px;
+  overflow: auto;
+}
+
+.error-banner {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: var(--fm-bad-bg);
+  color: var(--fm-bad);
+}

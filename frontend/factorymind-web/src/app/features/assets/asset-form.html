@@ -1,0 +1,83 @@
+<a mat-button routerLink="/assets">
+  <mat-icon>arrow_back</mat-icon>
+  Machines
+</a>
+
+<header class="page-header">
+  <div>
+    <h1>New machine</h1>
+    <p class="subtitle">The asset code identifies the machine in telemetry, alerts and work orders, so it cannot be changed later.</p>
+  </div>
+</header>
+
+<mat-card>
+  <mat-card-content>
+    <form class="form" [formGroup]="form" (ngSubmit)="save()">
+      <mat-form-field appearance="outline">
+        <mat-label>Asset code</mat-label>
+        <input matInput formControlName="assetCode" placeholder="M-110" />
+        @if (form.controls.assetCode.hasError('pattern')) {
+          <mat-error>Letters, digits and dashes only</mat-error>
+        } @else {
+          <mat-error>Required</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Name</mat-label>
+        <input matInput formControlName="name" placeholder="Main conveyor motor" />
+        <mat-error>Required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Factory</mat-label>
+        <mat-select formControlName="factoryId">
+          @for (f of factories.value() ?? []; track f.id) {
+            <mat-option [value]="f.id">{{ f.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-error>Required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Production line</mat-label>
+        <mat-select formControlName="lineId">
+          @for (l of lines.value() ?? []; track l.id) {
+            <mat-option [value]="l.id">{{ l.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-hint>Pick a factory first</mat-hint>
+        <mat-error>Required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Manufacturer</mat-label>
+        <input matInput formControlName="manufacturer" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Model</mat-label>
+        <input matInput formControlName="model" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Criticality</mat-label>
+        <mat-select formControlName="criticality">
+          @for (c of criticalities; track c) {
+            <mat-option [value]="c">{{ c }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Installed on</mat-label>
+        <input matInput type="date" formControlName="installedAt" />
+      </mat-form-field>
+
+      <div class="buttons">
+        <button mat-flat-button type="submit" [disabled]="saving()">Create machine</button>
+        <a mat-button routerLink="/assets">Cancel</a>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card>

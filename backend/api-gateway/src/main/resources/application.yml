@@ -1,0 +1,32 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/api/**]':
+                allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+                allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+                allowed-headers: ["*"]
+                exposed-headers: [Location]
+          routes:
+            - id: asset-service
+              uri: ${ASSET_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/factories/**,/api/production-lines/**,/api/assets/**
+            # Next routes, added with their services:
+            # telemetry-service   -> /api/telemetry/**
+            # maintenance-service -> /api/maintenance/**
+            # alert-service       -> /api/alerts/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway

@@ -1,0 +1,67 @@
+.shell {
+  height: 100vh;
+}
+
+.sidenav {
+  width: 240px;
+  background: var(--fm-nav-bg);
+  color: var(--fm-nav-fg);
+  border-right: none;
+
+  --mat-list-list-item-label-text-color: var(--fm-nav-fg);
+  --mat-list-list-item-leading-icon-color: var(--fm-nav-fg-muted);
+  --mat-list-list-item-supporting-text-color: var(--fm-nav-fg-muted);
+  --mat-list-list-item-hover-label-text-color: #fff;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px 12px;
+  font-size: 18px;
+
+  mat-icon {
+    color: var(--fm-accent);
+  }
+
+  span {
+    color: var(--fm-accent);
+    margin-left: 4px;
+  }
+}
+
+.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.phase {
+  font-size: 11px;
+}
+
+.toolbar {
+  background: var(--fm-surface);
+  border-bottom: 1px solid var(--fm-border);
+  font-size: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.demo-badge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--fm-warn-bg);
+  color: var(--fm-warn);
+}
+
+.content {
+  padding: 24px;
+  max-width: 1280px;
+}

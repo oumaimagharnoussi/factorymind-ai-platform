@@ -1,0 +1,86 @@
+<header class="page-header">
+  <div>
+    <h1>Machine health</h1>
+    <p class="subtitle">Status of every registered machine across all factories.</p>
+  </div>
+</header>
+
+@if (errorMessage(); as message) {
+  <div class="error-banner" role="alert">{{ message }}</div>
+}
+
+@if (summary.isLoading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+@if (summary.value(); as s) {
+  <section class="kpis">
+    <mat-card class="kpi">
+      <span class="kpi-label">Machines</span>
+      <span class="kpi-value">{{ s.total }}</span>
+    </mat-card>
+    <mat-card class="kpi">
+      <span class="kpi-label">Able to produce</span>
+      <span class="kpi-value">{{ operationalRate() * 100 | number: '1.0-0' }}%</span>
+      <span class="kpi-hint">Operational + warning</span>
+    </mat-card>
+    <mat-card class="kpi warn">
+      <span class="kpi-label">Warnings</span>
+      <span class="kpi-value">{{ s.byStatus.WARNING }}</span>
+    </mat-card>
+    <mat-card class="kpi bad">
+      <span class="kpi-label">Stopped</span>
+      <span class="kpi-value">{{ s.byStatus.STOPPED }}</span>
+    </mat-card>
+    <mat-card class="kpi info">
+      <span class="kpi-label">In maintenance</span>
+      <span class="kpi-value">{{ s.byStatus.MAINTENANCE }}</span>
+    </mat-card>
+  </section>
+
+  <section class="grid">
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Needs attention</mat-card-title>
+        <mat-card-subtitle>Stopped first, then warnings</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (attention.value(); as machines) {
+          @if (machines.length === 0) {
+            <p class="empty">All machines are operating normally.</p>
+          } @else {
+            <ul class="attention">
+              @for (m of machines; track m.id) {
+                <li>
+                  <a [routerLink]="['/assets', m.id]">
+                    <strong>{{ m.assetCode }}</strong> {{ m.name }}
+                  </a>
+                  <span class="where">{{ m.factoryName }} · {{ m.lineName }}</span>
+                  <app-status-chip [value]="m.status" />
+                </li>
+              }
+            </ul>
+          }
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Fleet by criticality</mat-card-title>
+        <mat-card-subtitle>Impact on production if the machine stops</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @for (c of criticalities; track c) {
+          <div class="bar-row">
+            <app-status-chip [value]="c" />
+            <div class="bar" role="img" [attr.aria-label]="c + ': ' + s.byCriticality[c]">
+              <div class="fill" [style.width.%]="share(s.byCriticality[c])"></div>
+            </div>
+            <span class="count">{{ s.byCriticality[c] }}</span>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  </section>
+}

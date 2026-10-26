@@ -1,0 +1,52 @@
+.back {
+  margin-bottom: 8px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px 16px;
+  margin: 8px 0 0;
+
+  dt {
+    color: var(--fm-text-muted);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.placeholder-card p {
+  color: var(--fm-text-muted);
+}
+
+.sensor-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+  margin-top: 16px;
+}
+
+.add-sensor {
+  margin-top: 16px;
+}
+
+.empty {
+  padding: 16px;
+  color: var(--fm-text-muted);
+}

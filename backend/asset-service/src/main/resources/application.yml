@@ -1,0 +1,33 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: asset-service
+  datasource:
+    url: ${ASSET_DB_URL:jdbc:postgresql://localhost:5432/asset_db}
+    username: ${ASSET_DB_USER:factorymind}
+    password: ${ASSET_DB_PASSWORD:factorymind}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    # db/demo holds sample factories and machines; set FLYWAY_LOCATIONS=classpath:db/migration to start empty.
+    locations: ${FLYWAY_LOCATIONS:classpath:db/migration,classpath:db/demo}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

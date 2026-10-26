@@ -1,0 +1,107 @@
+<header class="page-header">
+  <div>
+    <h1>Machines</h1>
+    <p class="subtitle">Every registered asset with its line, criticality and current status.</p>
+  </div>
+  <a mat-flat-button routerLink="/assets/new">
+    <mat-icon>add</mat-icon>
+    New machine
+  </a>
+</header>
+
+<form class="filters" [formGroup]="filters">
+  <mat-form-field appearance="outline" class="search">
+    <mat-label>Search code, name or model</mat-label>
+    <mat-icon matPrefix>search</mat-icon>
+    <input matInput formControlName="q" />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Factory</mat-label>
+    <mat-select formControlName="factoryId">
+      <mat-option [value]="null">All factories</mat-option>
+      @for (f of factories.value() ?? []; track f.id) {
+        <mat-option [value]="f.id">{{ f.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Status</mat-label>
+    <mat-select formControlName="status">
+      <mat-option [value]="null">Any status</mat-option>
+      @for (s of statuses; track s) {
+        <mat-option [value]="s">{{ s }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Criticality</mat-label>
+    <mat-select formControlName="criticality">
+      <mat-option [value]="null">Any criticality</mat-option>
+      @for (c of criticalities; track c) {
+        <mat-option [value]="c">{{ c }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <button mat-button type="button" (click)="clearFilters()">Clear</button>
+</form>
+
+<div class="table-card">
+  @if (assets.isLoading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <table mat-table [dataSource]="assets.value()?.content ?? []">
+    <ng-container matColumnDef="assetCode">
+      <th mat-header-cell *matHeaderCellDef>Code</th>
+      <td mat-cell *matCellDef="let a"><strong>{{ a.assetCode }}</strong></td>
+    </ng-container>
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>Machine</th>
+      <td mat-cell *matCellDef="let a">
+        {{ a.name }}
+        @if (a.model) {
+          <div class="secondary">{{ a.manufacturer }} {{ a.model }}</div>
+        }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="location">
+      <th mat-header-cell *matHeaderCellDef>Location</th>
+      <td mat-cell *matCellDef="let a">
+        {{ a.factoryName }}
+        <div class="secondary">{{ a.lineName }}</div>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="criticality">
+      <th mat-header-cell *matHeaderCellDef>Criticality</th>
+      <td mat-cell *matCellDef="let a"><app-status-chip [value]="a.criticality" /></td>
+    </ng-container>
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef>Status</th>
+      <td mat-cell *matCellDef="let a"><app-status-chip [value]="a.status" /></td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="columns"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns" class="clickable" [routerLink]="['/assets', row.id]"></tr>
+    <tr class="mat-row" *matNoDataRow>
+      <td class="empty" [attr.colspan]="columns.length">
+        @if (assets.error()) {
+          Machines could not be loaded.
+        } @else if (!assets.isLoading()) {
+          No machine matches these filters.
+        }
+      </td>
+    </tr>
+  </table>
+
+  <mat-paginator
+    [length]="assets.value()?.totalElements ?? 0"
+    [pageIndex]="query().page"
+    [pageSize]="query().size"
+    [pageSizeOptions]="[10, 20, 50]"
+    (page)="onPage($event)"
+  />
+</div>

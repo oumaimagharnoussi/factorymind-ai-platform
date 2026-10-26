@@ -1,0 +1,29 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+
+  .search {
+    flex: 1 1 260px;
+  }
+}
+
+.secondary {
+  color: var(--fm-text-muted);
+  font-size: 12px;
+}
+
+.clickable {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--fm-hover);
+  }
+}
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--fm-text-muted);
+}
