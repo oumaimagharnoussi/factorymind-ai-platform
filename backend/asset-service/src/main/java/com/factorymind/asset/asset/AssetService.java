@@ -11,12 +11,14 @@ import com.factorymind.asset.common.NotFoundException;
 import com.factorymind.asset.common.PageResponse;
 import com.factorymind.asset.line.ProductionLine;
 import com.factorymind.asset.line.ProductionLineService;
+import com.factorymind.asset.sensor.SensorCatalogChanged;
 import com.factorymind.asset.sensor.SensorDefinitionRepository;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,11 +30,14 @@ public class AssetService {
     private final AssetRepository assets;
     private final ProductionLineService lines;
     private final SensorDefinitionRepository sensors;
+    private final ApplicationEventPublisher events;
 
-    public AssetService(AssetRepository assets, ProductionLineService lines, SensorDefinitionRepository sensors) {
+    public AssetService(AssetRepository assets, ProductionLineService lines, SensorDefinitionRepository sensors,
+                        ApplicationEventPublisher events) {
         this.assets = assets;
         this.lines = lines;
         this.sensors = sensors;
+        this.events = events;
     }
 
     public PageResponse<AssetResponse> search(AssetFilter filter, Pageable pageable) {
@@ -74,6 +79,7 @@ public class AssetService {
     @Transactional
     public void delete(UUID id) {
         Asset asset = get(id);
+        sensors.findIdsByAssetId(id).forEach(sensorId -> events.publishEvent(SensorCatalogChanged.removed(sensorId)));
         sensors.deleteByAssetId(id);
         assets.delete(asset);
     }

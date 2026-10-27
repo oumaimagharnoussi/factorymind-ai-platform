@@ -19,6 +19,7 @@
 
     <modules>
         <module>asset-service</module>
+        <module>telemetry-service</module>
         <module>api-gateway</module>
     </modules>
 

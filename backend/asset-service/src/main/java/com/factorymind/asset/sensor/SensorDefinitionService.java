@@ -11,6 +11,7 @@ import com.factorymind.asset.sensor.SensorDtos.UpdateSensorRequest;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,10 +21,13 @@ public class SensorDefinitionService {
 
     private final SensorDefinitionRepository sensors;
     private final AssetService assets;
+    private final ApplicationEventPublisher events;
 
-    public SensorDefinitionService(SensorDefinitionRepository sensors, AssetService assets) {
+    public SensorDefinitionService(SensorDefinitionRepository sensors, AssetService assets,
+                                   ApplicationEventPublisher events) {
         this.sensors = sensors;
         this.assets = assets;
+        this.events = events;
     }
 
     public List<SensorResponse> findByAsset(UUID assetId) {
@@ -40,7 +44,9 @@ public class SensorDefinitionService {
         }
         SensorDefinition sensor = new SensorDefinition(asset, request.sensorType(), request.unit(),
                 request.warningThreshold(), request.criticalThreshold());
-        return toResponse(sensors.save(sensor));
+        sensors.save(sensor);
+        events.publishEvent(SensorCatalogChanged.saved(sensor));
+        return toResponse(sensor);
     }
 
     @Transactional
@@ -48,12 +54,14 @@ public class SensorDefinitionService {
         SensorDefinition sensor = get(assetId, sensorId);
         validateThresholds(request.warningThreshold(), request.criticalThreshold());
         sensor.update(request.unit(), request.warningThreshold(), request.criticalThreshold());
+        events.publishEvent(SensorCatalogChanged.saved(sensor));
         return toResponse(sensor);
     }
 
     @Transactional
     public void delete(UUID assetId, UUID sensorId) {
         sensors.delete(get(assetId, sensorId));
+        events.publishEvent(SensorCatalogChanged.removed(sensorId));
     }
 
     private SensorDefinition get(UUID assetId, UUID sensorId) {

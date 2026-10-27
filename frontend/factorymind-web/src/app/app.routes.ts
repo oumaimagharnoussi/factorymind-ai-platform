@@ -42,7 +42,8 @@ export const routes: Routes = [
       },
       {
         path: 'monitoring',
-        ...soon('Live monitoring', 'weeks 5–7', 'Sensor simulator → Kafka → telemetry service → live charts and threshold alerts.'),
+        title: 'Live monitoring · FactoryMind AI',
+        loadComponent: () => import('./features/monitoring/live-monitoring').then((m) => m.LiveMonitoring),
       },
       {
         path: 'maintenance/orders',

@@ -1,9 +1,8 @@
 -- One database per service: a service never reads another service's tables.
-CREATE DATABASE asset_db;
+-- Run by the db-init container on every start; each line only creates a database that is missing,
+-- so a Postgres volume from an earlier phase gets the new databases too.
+SELECT 'CREATE DATABASE asset_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'asset_db')\gexec
 -- Keycloak users and sessions (production only; dev Keycloak keeps them in the container).
-CREATE DATABASE keycloak_db;
--- Added in later phases:
--- CREATE DATABASE telemetry_db;
--- CREATE DATABASE maintenance_db;
--- CREATE DATABASE inventory_db;
--- CREATE DATABASE alert_db;
+SELECT 'CREATE DATABASE keycloak_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak_db')\gexec
+SELECT 'CREATE DATABASE telemetry_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'telemetry_db')\gexec
+-- Added in later phases: maintenance_db, inventory_db, alert_db.

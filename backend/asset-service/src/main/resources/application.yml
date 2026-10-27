@@ -12,6 +12,15 @@ spring:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/auth/realms/factorymind}
           # Signing keys; inside Docker this goes to keycloak:8080 while the issuer stays the public URL.
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/auth/realms/factorymind/protocol/openid-connect/certs}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        # Plain JSON: consumers map it to their own classes, not to com.factorymind.asset types.
+        spring.json.add.type.headers: false
+        # Fail fast instead of blocking a request thread for a minute when Kafka is down.
+        max.block.ms: 5000
   datasource:
     url: ${ASSET_DB_URL:jdbc:postgresql://localhost:5432/asset_db}
     username: ${ASSET_DB_USER:factorymind}

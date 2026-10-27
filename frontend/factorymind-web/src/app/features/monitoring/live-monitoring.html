@@ -1,0 +1,117 @@
+<header class="page-header">
+  <div>
+    <h1>Live monitoring</h1>
+    <p class="subtitle">
+      Sensor readings from Kafka, checked against each sensor's warning and critical limits.
+    </p>
+  </div>
+  <span class="connection" [class]="connection()">
+    <span class="dot"></span>
+    @switch (connection()) {
+      @case ('live') {
+        Live
+      }
+      @case ('connecting') {
+        Connecting…
+      }
+      @case ('reconnecting') {
+        Reconnecting…
+      }
+    }
+  </span>
+</header>
+
+@if (error(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+}
+
+@if (board() === null && !error()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+@if (board()) {
+  <section class="kpis">
+    <mat-card class="kpi">
+      <span class="label">Sensors normal</span>
+      <strong class="ok">{{ counts().normal }}</strong>
+    </mat-card>
+    <mat-card class="kpi">
+      <span class="label">In warning</span>
+      <strong class="warn">{{ counts().warning }}</strong>
+    </mat-card>
+    <mat-card class="kpi">
+      <span class="label">Critical</span>
+      <strong class="bad">{{ counts().critical }}</strong>
+    </mat-card>
+  </section>
+
+  <div class="layout">
+    <section class="machines">
+      @for (machine of machines(); track machine.assetId) {
+        <mat-card class="machine" [class]="'machine ' + machine.status">
+          <header>
+            <div>
+              <a class="code" [routerLink]="['/assets', machine.assetId]">{{ code(machine) }}</a>
+              <span class="name">{{ machine.asset?.name }}</span>
+              @if (machine.asset; as asset) {
+                <span class="where">{{ asset.lineName }} · {{ asset.factoryName }}</span>
+              }
+            </div>
+            <app-status-chip [value]="machine.status" />
+          </header>
+          @for (sensor of machine.sensors; track sensor.snapshot.sensorType) {
+            <div class="sensor">
+              <span class="type">{{ labels[sensor.snapshot.sensorType] }}</span>
+              <app-sparkline
+                [values]="sensor.history"
+                [warning]="sensor.snapshot.warningThreshold"
+                [critical]="sensor.snapshot.criticalThreshold"
+                [tone]="sensor.snapshot.status"
+              />
+              <span class="value" [class]="'value ' + sensor.snapshot.status">
+                {{ sensor.snapshot.value | number: '1.1-2' }}
+                <small>{{ sensor.snapshot.unit }}</small>
+              </span>
+              <span class="limits">
+                @if (sensor.snapshot.warningThreshold !== null) {
+                  warn {{ sensor.snapshot.warningThreshold | number: '1.0-1' }} · crit
+                  {{ sensor.snapshot.criticalThreshold | number: '1.0-1' }}
+                } @else {
+                  no limits yet
+                }
+              </span>
+            </div>
+          }
+        </mat-card>
+      } @empty {
+        <mat-card class="empty">
+          <mat-icon>sensors_off</mat-icon>
+          <p>
+            No readings yet. Start the telemetry service with SIMULATOR_ENABLED=true, or send
+            readings to Kafka.
+          </p>
+        </mat-card>
+      }
+    </section>
+
+    <mat-card class="changes">
+      <h2>Status changes</h2>
+      @for (change of changes(); track $index) {
+        <div class="change">
+          <time>{{ change.recordedAt | date: 'HH:mm:ss' }}</time>
+          <span
+            ><strong>{{ machineCode(change.assetId) }}</strong>
+            {{ labels[change.sensorType] | lowercase }}</span
+          >
+          <span class="transition">
+            <app-status-chip [value]="change.previousStatus ?? 'UNKNOWN'" />
+            <mat-icon>arrow_forward</mat-icon>
+            <app-status-chip [value]="change.status" />
+          </span>
+        </div>
+      } @empty {
+        <p class="hint">Changes between normal, warning and critical appear here as they happen.</p>
+      }
+    </mat-card>
+  </div>
+}

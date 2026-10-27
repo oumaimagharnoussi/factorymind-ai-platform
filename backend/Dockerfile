@@ -4,6 +4,7 @@ ARG MODULE
 WORKDIR /workspace
 COPY pom.xml .
 COPY asset-service/pom.xml asset-service/pom.xml
+COPY telemetry-service/pom.xml telemetry-service/pom.xml
 COPY api-gateway/pom.xml api-gateway/pom.xml
 RUN mvn -B -q -pl ${MODULE} -am dependency:go-offline
 COPY . .

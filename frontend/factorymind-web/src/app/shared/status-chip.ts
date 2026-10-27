@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 
-/** Coloured pill for machine status, line status and criticality values. */
+/** Coloured pill for machine status, line status, criticality and sensor reading status values. */
 @Component({
   selector: 'app-status-chip',
   template: `<span class="chip" [class]="tone()">{{ label() }}</span>`,
@@ -30,6 +30,7 @@ export class StatusChip {
     switch (this.value()) {
       case 'OPERATIONAL':
       case 'RUNNING':
+      case 'NORMAL':
       case 'LOW':
         return 'chip ok';
       case 'WARNING':

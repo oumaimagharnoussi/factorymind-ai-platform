@@ -98,3 +98,44 @@ export interface ProblemDetail {
   detail?: string;
   errors?: Record<string, string>;
 }
+
+// Telemetry service
+
+export type ReadingStatus = 'NORMAL' | 'WARNING' | 'CRITICAL' | 'UNKNOWN';
+
+/** Latest value of one sensor with the limits it is judged against (null when telemetry has no limits yet). */
+export interface SensorSnapshot {
+  assetId: string;
+  sensorType: SensorType;
+  value: number;
+  unit: string | null;
+  status: ReadingStatus;
+  recordedAt: string;
+  statusSince: string;
+  warningThreshold: number | null;
+  criticalThreshold: number | null;
+}
+
+export interface ReadingPoint {
+  assetId: string;
+  sensorType: SensorType;
+  value: number;
+  status: ReadingStatus;
+  recordedAt: string;
+}
+
+export interface SensorStatusChange {
+  assetId: string;
+  sensorType: SensorType;
+  previousStatus: ReadingStatus | null;
+  status: ReadingStatus;
+  value: number;
+  unit: string | null;
+  warningThreshold: number | null;
+  criticalThreshold: number | null;
+  recordedAt: string;
+}
+
+export type TelemetryEvent =
+  | { type: 'reading'; data: SensorSnapshot }
+  | { type: 'status'; data: SensorStatusChange };

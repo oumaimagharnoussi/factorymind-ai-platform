@@ -28,8 +28,12 @@ spring:
               uri: ${ASSET_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/api/factories/**,/api/production-lines/**,/api/assets/**
+            # Includes /api/telemetry/stream: the gateway streams Server-Sent Events through as they come.
+            - id: telemetry-service
+              uri: ${TELEMETRY_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/telemetry/**
             # Next routes, added with their services:
-            # telemetry-service   -> /api/telemetry/**
             # maintenance-service -> /api/maintenance/**
             # alert-service       -> /api/alerts/**
 

@@ -11,11 +11,63 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./infrastructure/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 5s
       retries: 10
+
+  # Creates the per-service databases that are missing, then exits.
+  db-init:
+    image: postgres:17-alpine
+    command: psql -v ON_ERROR_STOP=1 -h postgres -U ${POSTGRES_USER:-factorymind} -d factorymind -f /init-databases.sql
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-factorymind}
+    volumes:
+      - ./infrastructure/postgres/init-databases.sql:/init-databases.sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Single-node Kafka in KRaft mode (no ZooKeeper). Containers use kafka:29092, apps started from the IDE use localhost:9092.
+  kafka:
+    image: apache/kafka:4.3.1
+    environment:
+      CLUSTER_ID: y99an3bgT1quyd0vbekr7g  # any 22-character base64 UUID (kafka-storage.sh random-uuid)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Each service declares the topics it owns (partitions, compaction); a typo must not create a new one.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # Topics, messages and consumer lag in the browser: http://localhost:8085
+  kafka-ui:
+    image: kafbat/kafka-ui:v1.5.0
+    environment:
+      KAFKA_CLUSTERS_0_NAME: factorymind
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports:
+      - "8085:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.1
@@ -41,12 +93,39 @@ services:
       ASSET_DB_URL: jdbc:postgresql://postgres:5432/asset_db
       ASSET_DB_USER: ${POSTGRES_USER:-factorymind}
       ASSET_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KEYCLOAK_ISSUER_URI: http://localhost:8180/auth/realms/factorymind
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
     ports:
       - "8081:8081"
     depends_on:
-      postgres:
+      db-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+  telemetry-service:
+    build:
+      context: ./backend
+      args:
+        MODULE: telemetry-service
+    environment:
+      TELEMETRY_DB_URL: jdbc:postgresql://postgres:5432/telemetry_db
+      TELEMETRY_DB_USER: ${POSTGRES_USER:-factorymind}
+      TELEMETRY_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KEYCLOAK_ISSUER_URI: http://localhost:8180/auth/realms/factorymind
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
+      # Demo: fake sensors for the machines of the demo data. Turn off when real readings come in.
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-true}
+    ports:
+      - "8082:8082"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka:
         condition: service_healthy
       keycloak:
         condition: service_started
@@ -58,6 +137,7 @@ services:
         MODULE: api-gateway
     environment:
       ASSET_SERVICE_URL: http://asset-service:8081
+      TELEMETRY_SERVICE_URL: http://telemetry-service:8082
       CORS_ALLOWED_ORIGINS: http://localhost:4200
       KEYCLOAK_ISSUER_URI: http://localhost:8180/auth/realms/factorymind
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
@@ -65,6 +145,7 @@ services:
       - "8080:8080"
     depends_on:
       - asset-service
+      - telemetry-service
       - keycloak
 
   web:
@@ -74,7 +155,8 @@ services:
     depends_on:
       - api-gateway
 
-  # Next phases: kafka, redis, telemetry-service, prometheus, grafana.
+  # Next phases: maintenance-service, alert-service, redis, prometheus, grafana.
 
 volumes:
   postgres-data:
+  kafka-data:

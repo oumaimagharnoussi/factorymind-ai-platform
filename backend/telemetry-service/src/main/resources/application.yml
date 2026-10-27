@@ -1,0 +1,63 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: telemetry-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Must equal the "iss" claim of the tokens the browser gets from Keycloak.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/auth/realms/factorymind}
+          # Signing keys; inside Docker this goes to keycloak:8080 while the issuer stays the public URL.
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/auth/realms/factorymind/protocol/openid-connect/certs}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Bytes in, objects out: KafkaConfig's message converter maps JSON to each listener's parameter type.
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        max.block.ms: 5000
+  datasource:
+    url: ${TELEMETRY_DB_URL:jdbc:postgresql://localhost:5432/telemetry_db}
+    username: ${TELEMETRY_DB_USER:factorymind}
+    password: ${TELEMETRY_DB_PASSWORD:factorymind}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  mvc:
+    problemdetails:
+      enabled: true
+
+telemetry:
+  # Raw readings older than this are deleted every hour.
+  retention: ${TELEMETRY_RETENTION:P3D}
+  simulator:
+    enabled: ${SIMULATOR_ENABLED:false}
+    interval: ${SIMULATOR_INTERVAL:PT3S}
+    # Demo machines that slowly fail: M-104 Electric Motor Drive and M-102 Hydraulic Press.
+    degrading: ${SIMULATOR_DEGRADING:33333333-0000-0000-0000-000000000104,33333333-0000-0000-0000-000000000102}
+    degrade-cycle: ${SIMULATOR_DEGRADE_CYCLE:PT6M}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

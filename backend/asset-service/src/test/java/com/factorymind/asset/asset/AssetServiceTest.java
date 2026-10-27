@@ -14,14 +14,18 @@ import com.factorymind.asset.factory.Factory;
 import com.factorymind.asset.line.LineStatus;
 import com.factorymind.asset.line.ProductionLine;
 import com.factorymind.asset.line.ProductionLineService;
+import com.factorymind.asset.sensor.SensorCatalogChanged;
 import com.factorymind.asset.sensor.SensorDefinitionRepository;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class AssetServiceTest {
@@ -34,6 +38,9 @@ class AssetServiceTest {
 
     @Mock
     SensorDefinitionRepository sensors;
+
+    @Mock
+    ApplicationEventPublisher events;
 
     @InjectMocks
     AssetService service;
@@ -62,6 +69,22 @@ class AssetServiceTest {
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("M-104");
         verify(assets, never()).save(any());
+    }
+
+    @Test
+    void deleteTellsOtherServicesThatTheMachineSensorsAreGone() {
+        UUID id = UUID.randomUUID();
+        UUID temperature = UUID.randomUUID();
+        UUID vibration = UUID.randomUUID();
+        Asset asset = new Asset("M-300", "Old Motor", null, null, null, Criticality.LOW, null);
+        when(assets.findById(id)).thenReturn(Optional.of(asset));
+        when(sensors.findIdsByAssetId(id)).thenReturn(List.of(temperature, vibration));
+
+        service.delete(id);
+
+        verify(events).publishEvent(SensorCatalogChanged.removed(temperature));
+        verify(events).publishEvent(SensorCatalogChanged.removed(vibration));
+        verify(assets).delete(asset);
     }
 
     private CreateAssetRequest request(String code) {

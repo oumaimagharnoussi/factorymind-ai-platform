@@ -23,4 +23,14 @@ class GatewayRoutesTest {
         assertThat(route).isNotNull();
         assertThat(route.getUri().toString()).isEqualTo("http://localhost:8081");
     }
+
+    @Test
+    void telemetryRoutesPointToTelemetryService() {
+        Route route = routes.getRoutes()
+                .filter(r -> r.getId().equals("telemetry-service"))
+                .blockFirst();
+
+        assertThat(route).isNotNull();
+        assertThat(route.getUri().toString()).isEqualTo("http://localhost:8082");
+    }
 }

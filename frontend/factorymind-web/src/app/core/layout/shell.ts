@@ -39,7 +39,7 @@ export class Shell {
     { path: '/dashboard', label: 'Dashboard', icon: 'space_dashboard' },
     { path: '/factories', label: 'Factories', icon: 'factory' },
     { path: '/assets', label: 'Machines', icon: 'precision_manufacturing' },
-    { path: '/monitoring', label: 'Live monitoring', icon: 'monitor_heart', phase: 'Weeks 5–7' },
+    { path: '/monitoring', label: 'Live monitoring', icon: 'monitor_heart' },
     { path: '/maintenance/orders', label: 'Work orders', icon: 'build', phase: 'Weeks 8–9' },
     { path: '/inventory', label: 'Spare parts', icon: 'inventory_2', phase: 'Weeks 8–9' },
     { path: '/ai-insights', label: 'AI risk center', icon: 'insights', phase: 'Weeks 10–11' },

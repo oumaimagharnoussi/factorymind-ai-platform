@@ -34,6 +34,9 @@ jobs:
           - name: asset-service
             context: backend
             module: asset-service
+          - name: telemetry-service
+            context: backend
+            module: telemetry-service
           - name: api-gateway
             context: backend
             module: api-gateway

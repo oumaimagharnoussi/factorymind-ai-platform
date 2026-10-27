@@ -13,6 +13,12 @@ public interface SensorDefinitionRepository extends JpaRepository<SensorDefiniti
 
     Optional<SensorDefinition> findByIdAndAssetId(UUID id, UUID assetId);
 
+    @Query("select s from SensorDefinition s join fetch s.asset")
+    List<SensorDefinition> findAllWithAsset();
+
+    @Query("select s.id from SensorDefinition s where s.asset.id = :assetId")
+    List<UUID> findIdsByAssetId(UUID assetId);
+
     boolean existsByAssetIdAndSensorType(UUID assetId, SensorType sensorType);
 
     @Modifying
