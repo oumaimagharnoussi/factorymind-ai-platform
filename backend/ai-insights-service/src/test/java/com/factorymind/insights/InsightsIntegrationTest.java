@@ -134,10 +134,13 @@ class InsightsIntegrationTest {
                         .andExpect(jsonPath("$.riskLevel").value("HIGH"))
                         .andExpect(jsonPath("$.mainSensorType").value("TEMPERATURE"))
                         .andExpect(jsonPath("$.sensors[0].drivers[0]").value("trend reaches the critical limit in about 7 min")));
+        // The scorer may have run while the readings were still arriving, so wait for a call that saw them all.
         ArgumentCaptor<Prediction.Request> request = ArgumentCaptor.forClass(Prediction.Request.class);
-        verify(model, atLeastOnce()).predict(request.capture());
-        assertThat(request.getValue().sensors()).singleElement()
-                .satisfies(sensor -> assertThat(sensor.readings()).hasSize(15));
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            verify(model, atLeastOnce()).predict(request.capture());
+            assertThat(request.getValue().sensors()).singleElement()
+                    .satisfies(sensor -> assertThat(sensor.readings()).hasSize(15));
+        });
 
         // Scored every second, announced once: only a change of level is an event.
         Thread.sleep(2500);
