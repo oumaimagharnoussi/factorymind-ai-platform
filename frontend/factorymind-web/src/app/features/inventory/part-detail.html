@@ -1,0 +1,152 @@
+<a mat-button routerLink="/inventory">
+  <mat-icon>arrow_back</mat-icon>
+  Spare parts
+</a>
+
+@if (part.isLoading() && !part.hasValue()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+@if (part.error()) {
+  <div class="error-banner" role="alert">This part could not be loaded.</div>
+}
+
+@if (part.value(); as p) {
+  <header class="page-header">
+    <div>
+      <h1>{{ p.partNumber }} · {{ p.name }}</h1>
+      <p class="subtitle">{{ humanize(p.category) }} · shelf {{ p.location ?? 'not set' }}</p>
+    </div>
+    <div class="actions">
+      @if (auth.hasAnyRole('ADMIN', 'ENGINEER')) {
+        <button mat-flat-button (click)="show('receive')">
+          <mat-icon>local_shipping</mat-icon>
+          Receive delivery
+        </button>
+      }
+      @if (auth.hasAnyRole('ADMIN')) {
+        <button mat-stroked-button (click)="show('count')">
+          <mat-icon>fact_check</mat-icon>
+          Stock count
+        </button>
+      }
+    </div>
+  </header>
+
+  <section class="counters">
+    <div class="counter" [class.bad]="p.quantityOnHand === 0" [class.warn]="p.lowStock && p.quantityOnHand > 0">
+      <strong>{{ p.quantityOnHand }}</strong> {{ p.unit }} on hand
+    </div>
+    <div class="counter"><strong>{{ p.minimumStock }}</strong> minimum</div>
+    <div class="counter"><strong>{{ p.unitCost | currency: 'EUR' }}</strong> each</div>
+    <div class="counter"><strong>{{ p.stockValue | currency: 'EUR' }}</strong> in stock</div>
+    @if (p.quantityOnHand === 0) {
+      <app-status-chip value="OUT_OF_STOCK" />
+    } @else if (p.lowStock) {
+      <app-status-chip value="LOW_STOCK" />
+    }
+  </section>
+
+  @if (openForm() === 'receive') {
+    <mat-card class="stock-card">
+      <mat-card-header><mat-card-title>Receive a delivery</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <form class="form" [formGroup]="receipt" (ngSubmit)="receive()">
+          <mat-form-field appearance="outline">
+            <mat-label>Quantity ({{ p.unit }})</mat-label>
+            <input matInput type="number" min="1" formControlName="quantity" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Delivery note / PO</mat-label>
+            <input matInput formControlName="reference" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>New unit cost (optional)</mat-label>
+            <input matInput type="number" min="0" step="0.01" formControlName="unitCost" />
+          </mat-form-field>
+          <div class="buttons">
+            <button mat-flat-button type="submit" [disabled]="saving() || receipt.invalid">Add to stock</button>
+            <button mat-button type="button" (click)="openForm.set(null)">Cancel</button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (openForm() === 'count') {
+    <mat-card class="stock-card">
+      <mat-card-header>
+        <mat-card-title>Stock count</mat-card-title>
+        <mat-card-subtitle>Enter what is physically on the shelf; the difference is recorded as an adjustment.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form class="form" [formGroup]="count" (ngSubmit)="adjust()">
+          <mat-form-field appearance="outline">
+            <mat-label>Counted ({{ p.unit }})</mat-label>
+            <input matInput type="number" min="0" formControlName="countedQuantity" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="wide">
+            <mat-label>Reason</mat-label>
+            <input matInput formControlName="note" placeholder="Quarterly count" />
+            <mat-error>Say why the stock is corrected.</mat-error>
+          </mat-form-field>
+          <div class="buttons">
+            <button mat-flat-button type="submit" [disabled]="saving()">Save count</button>
+            <button mat-button type="button" (click)="openForm.set(null)">Cancel</button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <h2 class="section-title">Stock movements</h2>
+  <div class="table-card">
+    <table mat-table [dataSource]="movements.value()?.content ?? []">
+      <ng-container matColumnDef="performedAt">
+        <th mat-header-cell *matHeaderCellDef>When</th>
+        <td mat-cell *matCellDef="let m">{{ m.performedAt | date: 'short' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="type">
+        <th mat-header-cell *matHeaderCellDef>Movement</th>
+        <td mat-cell *matCellDef="let m"><app-status-chip [value]="m.type" /></td>
+      </ng-container>
+      <ng-container matColumnDef="change">
+        <th mat-header-cell *matHeaderCellDef>Change</th>
+        <td mat-cell *matCellDef="let m" [class.positive]="m.change > 0" [class.negative]="m.change < 0">
+          {{ m.change > 0 ? '+' : '' }}{{ m.change }} {{ m.unit }}
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="after">
+        <th mat-header-cell *matHeaderCellDef>Stock after</th>
+        <td mat-cell *matCellDef="let m">{{ m.quantityAfter }}</td>
+      </ng-container>
+      <ng-container matColumnDef="reference">
+        <th mat-header-cell *matHeaderCellDef>For</th>
+        <td mat-cell *matCellDef="let m">
+          @if (m.workOrderId) {
+            <a [routerLink]="['/maintenance/orders', m.workOrderId]">{{ m.workOrderCode ?? 'work order' }}</a>
+          } @else {
+            {{ m.reference ?? '' }}
+          }
+          @if (m.note) {
+            <div class="secondary">{{ m.note }}</div>
+          }
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="by">
+        <th mat-header-cell *matHeaderCellDef>By</th>
+        <td mat-cell *matCellDef="let m">{{ m.performedBy }}</td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="empty" [attr.colspan]="columns.length">No movement yet.</td>
+      </tr>
+    </table>
+    <mat-paginator
+      [length]="movements.value()?.totalElements ?? 0"
+      [pageIndex]="page()"
+      [pageSize]="20"
+      (page)="onPage($event)"
+    />
+  </div>
+}

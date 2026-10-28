@@ -1,0 +1,174 @@
+<header class="page-header">
+  <div>
+    <h1>Alerts</h1>
+    <p class="subtitle">
+      A sensor raises an alert after 15 seconds outside its limits, and clears it after 30 seconds back
+      inside, so a noisy value does not flood this list.
+    </p>
+  </div>
+  <span class="live" [class.on]="live()" [matTooltip]="live() ? 'Updates arrive as they happen' : 'Connecting to the alert stream'">
+    <mat-icon>{{ live() ? 'sensors' : 'sensors_off' }}</mat-icon>
+    {{ live() ? 'Live' : 'Connecting' }}
+  </span>
+</header>
+
+@if (summary.value(); as s) {
+  <section class="counters">
+    <div class="counter bad"><strong>{{ s.critical }}</strong> critical</div>
+    <div class="counter warn"><strong>{{ s.warning }}</strong> warning</div>
+    <div class="counter"><strong>{{ s.active }}</strong> still active</div>
+    <div class="counter"><strong>{{ s.unacknowledged }}</strong> not acknowledged</div>
+  </section>
+}
+
+<div class="filters">
+  <mat-button-toggle-group [value]="view()" (change)="setView($event.value)" aria-label="Alerts to show">
+    <mat-button-toggle value="unresolved">Unresolved</mat-button-toggle>
+    <mat-button-toggle value="resolved">Resolved</mat-button-toggle>
+    <mat-button-toggle value="all">All</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Severity</mat-label>
+    <mat-select [value]="severity()" (selectionChange)="setSeverity($event.value)">
+      <mat-option [value]="null">Any severity</mat-option>
+      <mat-option value="CRITICAL">Critical</mat-option>
+      <mat-option value="WARNING">Warning</mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>
+
+@if (resolving(); as alert) {
+  <mat-card class="resolve-card">
+    <mat-card-header>
+      <mat-card-title>Resolve {{ sensorLabel(alert.sensorType).toLowerCase() }} alert on {{ assets.code(alert.assetId) }}</mat-card-title>
+      <mat-card-subtitle>Say what was found, so the next person knows.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <mat-form-field appearance="outline" class="note">
+        <mat-label>Resolution note</mat-label>
+        <textarea matInput rows="2" maxlength="500" [(ngModel)]="resolutionNote"></textarea>
+      </mat-form-field>
+      <div class="buttons">
+        <button mat-flat-button (click)="resolve()">Resolve</button>
+        <button mat-button (click)="resolving.set(null)">Cancel</button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+}
+
+<div class="table-card">
+  @if (alerts.isLoading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <table mat-table [dataSource]="alerts.value()?.content ?? []">
+    <ng-container matColumnDef="severity">
+      <th mat-header-cell *matHeaderCellDef>Severity</th>
+      <td mat-cell *matCellDef="let a"><app-status-chip [value]="a.severity" /></td>
+    </ng-container>
+    <ng-container matColumnDef="machine">
+      <th mat-header-cell *matHeaderCellDef>Machine</th>
+      <td mat-cell *matCellDef="let a">
+        <a [routerLink]="['/assets', a.assetId]"><strong>{{ assets.code(a.assetId) }}</strong></a>
+        {{ sensorLabel(a.sensorType) }}
+        <div class="secondary">{{ assets.name(a.assetId) }}</div>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="reading">
+      <th mat-header-cell *matHeaderCellDef>Last value</th>
+      <td mat-cell *matCellDef="let a">
+        @if (a.lastValue !== null) {
+          {{ a.lastValue | number: '1.0-2' }} {{ a.unit }}
+        }
+        <div class="secondary">limits {{ a.warningThreshold }} / {{ a.criticalThreshold }}</div>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="raised">
+      <th mat-header-cell *matHeaderCellDef>Raised</th>
+      <td mat-cell *matCellDef="let a">
+        {{ a.lastRaisedAt | date: 'short' }}
+        @if (a.occurrences > 1) {
+          <div class="secondary">{{ a.occurrences }} times since {{ a.raisedAt | date: 'shortTime' }}</div>
+        }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="state">
+      <th mat-header-cell *matHeaderCellDef>State</th>
+      <td mat-cell *matCellDef="let a">
+        <app-status-chip [value]="a.status" />
+        <div class="secondary condition" [class.active]="a.active">
+          @if (a.active) {
+            <mat-icon inline>error</mat-icon> still outside limits
+          } @else {
+            <mat-icon inline>check_circle</mat-icon> back to normal
+          }
+        </div>
+        @if (a.acknowledgedBy && a.status !== 'RESOLVED') {
+          <div class="secondary">by {{ a.acknowledgedBy }}</div>
+        }
+        @if (a.resolvedBy) {
+          <div class="secondary" [matTooltip]="a.resolutionNote ?? ''">resolved by {{ a.resolvedBy }}</div>
+        }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="workOrder">
+      <th mat-header-cell *matHeaderCellDef>Work order</th>
+      <td mat-cell *matCellDef="let a">
+        @if (a.workOrderId) {
+          <a [routerLink]="['/maintenance/orders', a.workOrderId]">{{ a.workOrderCode }}</a>
+          <div class="secondary">{{ a.workOrderStatus?.replace('_', ' ')?.toLowerCase() }}</div>
+        } @else if (a.status !== 'RESOLVED') {
+          <a mat-button routerLink="/maintenance/orders/new" [queryParams]="workOrderParams(a)">
+            <mat-icon>build</mat-icon>
+            Create
+          </a>
+        } @else {
+          <span class="secondary">—</span>
+        }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let a" class="actions">
+        @if (a.status === 'OPEN') {
+          <button mat-stroked-button (click)="acknowledge(a)">Acknowledge</button>
+        }
+        @if (a.status !== 'RESOLVED' && auth.hasAnyRole('ADMIN', 'ENGINEER')) {
+          <button
+            mat-button
+            [disabled]="a.active"
+            [matTooltip]="a.active ? 'Can be resolved once the sensor is back to normal' : ''"
+            (click)="startResolving(a)"
+          >
+            Resolve
+          </button>
+        }
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="columns"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns" [class.critical]="row.severity === 'CRITICAL' && row.active"></tr>
+    <tr class="mat-row" *matNoDataRow>
+      <td class="empty" [attr.colspan]="columns.length">
+        @if (alerts.error()) {
+          Alerts could not be loaded.
+        } @else if (!alerts.isLoading()) {
+          @if (view() === 'unresolved') {
+            No unresolved alert. Every sensor is within its limits.
+          } @else {
+            No alert matches these filters.
+          }
+        }
+      </td>
+    </tr>
+  </table>
+
+  <mat-paginator
+    [length]="alerts.value()?.totalElements ?? 0"
+    [pageIndex]="page().index"
+    [pageSize]="page().size"
+    [pageSizeOptions]="[10, 20, 50]"
+    (page)="onPage($event)"
+  />
+</div>

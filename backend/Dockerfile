@@ -5,6 +5,9 @@ WORKDIR /workspace
 COPY pom.xml .
 COPY asset-service/pom.xml asset-service/pom.xml
 COPY telemetry-service/pom.xml telemetry-service/pom.xml
+COPY alert-service/pom.xml alert-service/pom.xml
+COPY maintenance-service/pom.xml maintenance-service/pom.xml
+COPY inventory-service/pom.xml inventory-service/pom.xml
 COPY api-gateway/pom.xml api-gateway/pom.xml
 RUN mvn -B -q -pl ${MODULE} -am dependency:go-offline
 COPY . .

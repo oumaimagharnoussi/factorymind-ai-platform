@@ -1,0 +1,155 @@
+<header class="page-header">
+  <div>
+    <h1>Spare parts</h1>
+    <p class="subtitle">The plant store: what is on the shelf, what is running low, and where it went.</p>
+  </div>
+  @if (auth.hasAnyRole('ADMIN', 'ENGINEER') && !showForm()) {
+    <button mat-flat-button (click)="showForm.set(true)">
+      <mat-icon>add</mat-icon>
+      New part
+    </button>
+  }
+</header>
+
+@if (summary.value(); as s) {
+  <section class="counters">
+    <div class="counter"><strong>{{ s.parts }}</strong> parts</div>
+    <div class="counter warn"><strong>{{ s.lowStock }}</strong> at or below minimum</div>
+    <div class="counter bad"><strong>{{ s.outOfStock }}</strong> out of stock</div>
+    <div class="counter"><strong>{{ s.stockValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</strong> in stock</div>
+  </section>
+}
+
+@if (showForm()) {
+  <mat-card class="new-part">
+    <mat-card-header>
+      <mat-card-title>New spare part</mat-card-title>
+      <mat-card-subtitle>It starts with no stock; record its first delivery on the part page.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <form class="form" [formGroup]="form" (ngSubmit)="create()">
+        <mat-form-field appearance="outline">
+          <mat-label>Part number</mat-label>
+          <input matInput formControlName="partNumber" />
+          <mat-error>Letters, digits, dots, slashes and dashes.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Name</mat-label>
+          <input matInput formControlName="name" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Category</mat-label>
+          <mat-select formControlName="category">
+            @for (c of categories; track c) {
+              <mat-option [value]="c">{{ humanize(c) }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Unit</mat-label>
+          <input matInput formControlName="unit" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Minimum stock</mat-label>
+          <input matInput type="number" min="0" formControlName="minimumStock" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Unit cost (EUR)</mat-label>
+          <input matInput type="number" min="0" step="0.01" formControlName="unitCost" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Shelf</mat-label>
+          <input matInput formControlName="location" placeholder="A-01-03" />
+        </mat-form-field>
+        <div class="buttons">
+          <button mat-flat-button type="submit" [disabled]="saving()">Create</button>
+          <button mat-button type="button" (click)="showForm.set(false)">Cancel</button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+}
+
+<form class="filters" [formGroup]="filters">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search">
+    <mat-label>Search part number, name or shelf</mat-label>
+    <mat-icon matPrefix>search</mat-icon>
+    <input matInput formControlName="q" />
+  </mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Category</mat-label>
+    <mat-select formControlName="category">
+      <mat-option [value]="null">All categories</mat-option>
+      @for (c of categories; track c) {
+        <mat-option [value]="c">{{ humanize(c) }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  <mat-slide-toggle formControlName="lowStock">Running low only</mat-slide-toggle>
+</form>
+
+<div class="table-card">
+  @if (parts.isLoading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <table mat-table [dataSource]="parts.value()?.content ?? []">
+    <ng-container matColumnDef="partNumber">
+      <th mat-header-cell *matHeaderCellDef>Part number</th>
+      <td mat-cell *matCellDef="let p"><strong>{{ p.partNumber }}</strong></td>
+    </ng-container>
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>Name</th>
+      <td mat-cell *matCellDef="let p">
+        {{ p.name }}
+        @if (p.description) {
+          <div class="secondary">{{ p.description }}</div>
+        }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="category">
+      <th mat-header-cell *matHeaderCellDef>Category</th>
+      <td mat-cell *matCellDef="let p">{{ humanize(p.category) }}</td>
+    </ng-container>
+    <ng-container matColumnDef="stock">
+      <th mat-header-cell *matHeaderCellDef>On hand</th>
+      <td mat-cell *matCellDef="let p">
+        <span class="stock">{{ p.quantityOnHand }} {{ p.unit }}</span>
+        @if (p.quantityOnHand === 0) {
+          <app-status-chip value="OUT_OF_STOCK" />
+        } @else if (p.lowStock) {
+          <app-status-chip value="LOW_STOCK" />
+        }
+        <div class="secondary">minimum {{ p.minimumStock }}</div>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="unitCost">
+      <th mat-header-cell *matHeaderCellDef>Unit cost</th>
+      <td mat-cell *matCellDef="let p">{{ p.unitCost | currency: 'EUR' }}</td>
+    </ng-container>
+    <ng-container matColumnDef="location">
+      <th mat-header-cell *matHeaderCellDef>Shelf</th>
+      <td mat-cell *matCellDef="let p">{{ p.location ?? '—' }}</td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="columns"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns" class="clickable" [routerLink]="['/inventory', row.id]"></tr>
+    <tr class="mat-row" *matNoDataRow>
+      <td class="empty" [attr.colspan]="columns.length">
+        @if (parts.error()) {
+          Spare parts could not be loaded.
+        } @else if (!parts.isLoading()) {
+          No part matches these filters.
+        }
+      </td>
+    </tr>
+  </table>
+
+  <mat-paginator
+    [length]="parts.value()?.totalElements ?? 0"
+    [pageIndex]="query().page"
+    [pageSize]="query().size"
+    [pageSizeOptions]="[10, 20, 50]"
+    (page)="onPage($event)"
+  />
+</div>

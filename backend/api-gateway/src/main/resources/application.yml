@@ -33,9 +33,19 @@ spring:
               uri: ${TELEMETRY_SERVICE_URL:http://localhost:8082}
               predicates:
                 - Path=/api/telemetry/**
-            # Next routes, added with their services:
-            # maintenance-service -> /api/maintenance/**
-            # alert-service       -> /api/alerts/**
+            # Includes /api/alerts/stream (Server-Sent Events), like telemetry.
+            - id: alert-service
+              uri: ${ALERT_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/alerts/**
+            - id: maintenance-service
+              uri: ${MAINTENANCE_SERVICE_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/maintenance/**
+            - id: inventory-service
+              uri: ${INVENTORY_SERVICE_URL:http://localhost:8086}
+              predicates:
+                - Path=/api/inventory/**
 
 management:
   endpoints:

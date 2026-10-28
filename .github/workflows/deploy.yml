@@ -37,6 +37,15 @@ jobs:
           - name: telemetry-service
             context: backend
             module: telemetry-service
+          - name: alert-service
+            context: backend
+            module: alert-service
+          - name: maintenance-service
+            context: backend
+            module: maintenance-service
+          - name: inventory-service
+            context: backend
+            module: inventory-service
           - name: api-gateway
             context: backend
             module: api-gateway

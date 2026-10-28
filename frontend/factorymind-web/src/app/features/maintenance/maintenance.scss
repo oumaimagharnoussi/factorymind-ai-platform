@@ -1,0 +1,65 @@
+.counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.counter {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border);
+  color: var(--fm-text-muted);
+
+  strong {
+    color: var(--mat-sys-on-surface);
+    font-size: 18px;
+    margin-right: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.bad strong { color: var(--fm-bad); }
+  &.warn strong { color: var(--fm-warn); }
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+
+  .search {
+    flex: 1 1 240px;
+  }
+}
+
+.secondary {
+  color: var(--fm-text-muted);
+  font-size: 12px;
+}
+
+.from-alert {
+  color: var(--fm-bad);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.overdue {
+  color: var(--fm-bad);
+}
+
+.clickable {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--fm-hover);
+  }
+}
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--fm-text-muted);
+}

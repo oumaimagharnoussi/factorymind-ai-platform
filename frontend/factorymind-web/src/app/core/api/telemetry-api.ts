@@ -1,9 +1,9 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, filter, map } from 'rxjs';
 import { Auth } from '../auth/auth';
 import { ReadingPoint, SensorSnapshot, SensorType, TelemetryEvent } from './models';
-import { SseParser } from './sse';
+import { eventStream } from './sse';
 
 export interface ReadingQuery {
   assetId?: string;
@@ -27,45 +27,11 @@ export class TelemetryApi {
     return this.http.get<ReadingPoint[]>('/api/telemetry/readings', { params });
   }
 
-  /**
-   * Live readings and status changes. The browser's EventSource cannot send an Authorization header,
-   * so the stream is read with fetch. It completes when the server closes it (every 15 minutes);
-   * callers resubscribe, which also picks up a fresh token.
-   */
+  /** Live readings and status changes; completes every 15 minutes (see {@link eventStream}). */
   stream(): Observable<TelemetryEvent> {
-    return new Observable<TelemetryEvent>((subscriber) => {
-      const abort = new AbortController();
-      (async () => {
-        const token = await this.auth.token();
-        const response = await fetch('/api/telemetry/stream', {
-          headers: {
-            Accept: 'text/event-stream',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          signal: abort.signal,
-        });
-        if (!response.ok || !response.body) {
-          throw new Error(`Live stream refused (${response.status})`);
-        }
-        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-        const parser = new SseParser();
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          for (const message of parser.push(value)) {
-            if (message.event === 'reading' || message.event === 'status') {
-              subscriber.next({
-                type: message.event,
-                data: JSON.parse(message.data),
-              } as TelemetryEvent);
-            }
-          }
-        }
-        subscriber.complete();
-      })().catch((error: unknown) => {
-        if (!abort.signal.aborted) subscriber.error(error);
-      });
-      return () => abort.abort();
-    });
+    return eventStream('/api/telemetry/stream', () => this.auth.token()).pipe(
+      filter((message) => message.event === 'reading' || message.event === 'status'),
+      map((message) => ({ type: message.event, data: JSON.parse(message.data) }) as TelemetryEvent),
+    );
   }
 }

@@ -5,4 +5,6 @@ SELECT 'CREATE DATABASE asset_db' WHERE NOT EXISTS (SELECT FROM pg_database WHER
 -- Keycloak users and sessions (production only; dev Keycloak keeps them in the container).
 SELECT 'CREATE DATABASE keycloak_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak_db')\gexec
 SELECT 'CREATE DATABASE telemetry_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'telemetry_db')\gexec
--- Added in later phases: maintenance_db, inventory_db, alert_db.
+SELECT 'CREATE DATABASE alert_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'alert_db')\gexec
+SELECT 'CREATE DATABASE maintenance_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'maintenance_db')\gexec
+SELECT 'CREATE DATABASE inventory_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'inventory_db')\gexec

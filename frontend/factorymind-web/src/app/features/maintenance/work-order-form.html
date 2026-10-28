@@ -1,0 +1,85 @@
+<a mat-button routerLink="/maintenance/orders">
+  <mat-icon>arrow_back</mat-icon>
+  Work orders
+</a>
+
+<header class="page-header">
+  <div>
+    <h1>New work order</h1>
+    <p class="subtitle">
+      @if (auth.hasAnyRole('ADMIN', 'ENGINEER')) {
+        Plan a job on a machine.
+      } @else {
+        Report a problem; an engineer plans the job.
+      }
+    </p>
+  </div>
+</header>
+
+<mat-card>
+  <mat-card-content>
+    @if (alertId()) {
+      <p class="from-alert">
+        <mat-icon>notifications_active</mat-icon>
+        This work order answers an alert; it will be acknowledged automatically.
+      </p>
+    }
+    <form class="form" [formGroup]="form" (ngSubmit)="save()">
+      <mat-form-field appearance="outline">
+        <mat-label>Machine</mat-label>
+        <mat-select formControlName="assetId">
+          @for (a of assets.list(); track a.id) {
+            <mat-option [value]="a.id">{{ a.assetCode }} {{ a.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-error>Choose the machine.</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Type</mat-label>
+        <mat-select formControlName="type">
+          @for (t of types; track t) {
+            <mat-option [value]="t">{{ humanize(t) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="wide">
+        <mat-label>What needs to be done</mat-label>
+        <input matInput formControlName="title" maxlength="160" />
+        <mat-error>A short title is required.</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="wide">
+        <mat-label>Details</mat-label>
+        <textarea matInput rows="3" formControlName="description" maxlength="2000"></textarea>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Priority</mat-label>
+        <mat-select formControlName="priority">
+          @for (p of priorities; track p) {
+            <mat-option [value]="p">{{ humanize(p) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Due date</mat-label>
+        <input matInput type="date" formControlName="dueDate" />
+      </mat-form-field>
+
+      @if (auth.hasAnyRole('ADMIN', 'ENGINEER')) {
+        <mat-form-field appearance="outline">
+          <mat-label>Technician (user name)</mat-label>
+          <input matInput formControlName="assignee" maxlength="100" />
+        </mat-form-field>
+      }
+
+      <div class="buttons wide">
+        <button mat-flat-button type="submit" [disabled]="saving()">Create work order</button>
+        <a mat-button routerLink="/maintenance/orders">Cancel</a>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card>

@@ -33,4 +33,17 @@ class GatewayRoutesTest {
         assertThat(route).isNotNull();
         assertThat(route.getUri().toString()).isEqualTo("http://localhost:8082");
     }
+
+    @Test
+    void phaseFourRoutesPointToTheirServices() {
+        assertThat(uriOf("alert-service")).isEqualTo("http://localhost:8083");
+        assertThat(uriOf("maintenance-service")).isEqualTo("http://localhost:8084");
+        assertThat(uriOf("inventory-service")).isEqualTo("http://localhost:8086");
+    }
+
+    private String uriOf(String routeId) {
+        Route route = routes.getRoutes().filter(r -> r.getId().equals(routeId)).blockFirst();
+        assertThat(route).as("route %s", routeId).isNotNull();
+        return route.getUri().toString();
+    }
 }

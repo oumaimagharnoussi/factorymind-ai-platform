@@ -101,3 +101,18 @@
     color: var(--fm-accent);
   }
 }
+
+.kpi-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+
+  .kpi {
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  &:hover .kpi {
+    box-shadow: 0 0 0 1px var(--fm-accent);
+  }
+}

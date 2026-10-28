@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 
-/** Coloured pill for machine status, line status, criticality and sensor reading status values. */
+/** Coloured pill for status-like enum values: machines, sensors, alerts, work orders and stock. */
 @Component({
   selector: 'app-status-chip',
   template: `<span class="chip" [class]="tone()">{{ label() }}</span>`,
@@ -24,7 +24,7 @@ import { Component, computed, input } from '@angular/core';
 export class StatusChip {
   readonly value = input.required<string>();
 
-  protected readonly label = computed(() => this.value().replace('_', ' ').toLowerCase());
+  protected readonly label = computed(() => this.value().replaceAll('_', ' ').toLowerCase());
 
   protected readonly tone = computed(() => {
     switch (this.value()) {
@@ -32,15 +32,27 @@ export class StatusChip {
       case 'RUNNING':
       case 'NORMAL':
       case 'LOW':
+      case 'RESOLVED':
+      case 'COMPLETED':
+      case 'RECEIPT':
+      case 'RETURN':
         return 'chip ok';
       case 'WARNING':
       case 'HIGH':
+      case 'ON_HOLD':
+      case 'LOW_STOCK':
+      case 'ACKNOWLEDGED':
         return 'chip warn';
       case 'STOPPED':
       case 'CRITICAL':
+      case 'URGENT':
+      case 'OUT_OF_STOCK':
         return 'chip bad';
       case 'MAINTENANCE':
       case 'MEDIUM':
+      case 'OPEN':
+      case 'IN_PROGRESS':
+      case 'ISSUE':
         return 'chip info';
       default:
         return 'chip muted';

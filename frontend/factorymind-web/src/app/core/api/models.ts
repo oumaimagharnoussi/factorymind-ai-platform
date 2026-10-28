@@ -139,3 +139,243 @@ export interface SensorStatusChange {
 export type TelemetryEvent =
   | { type: 'reading'; data: SensorSnapshot }
   | { type: 'status'; data: SensorStatusChange };
+
+// Alert service
+
+export type AlertSeverity = 'WARNING' | 'CRITICAL';
+export type AlertStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
+export type AlertEventType =
+  | 'RAISED'
+  | 'ESCALATED'
+  | 'RETRIGGERED'
+  | 'CLEARED'
+  | 'ACKNOWLEDGED'
+  | 'RESOLVED'
+  | 'WORK_ORDER_UPDATED';
+
+/** One abnormal episode of one sensor. `active` is false once the sensor has been back to normal long enough. */
+export interface Alert {
+  id: string;
+  assetId: string;
+  sensorType: SensorType;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  active: boolean;
+  currentStatus: ReadingStatus;
+  lastValue: number | null;
+  unit: string | null;
+  warningThreshold: number | null;
+  criticalThreshold: number | null;
+  occurrences: number;
+  raisedAt: string;
+  lastRaisedAt: string;
+  escalatedAt: string | null;
+  clearedAt: string | null;
+  acknowledgedAt: string | null;
+  acknowledgedBy: string | null;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  resolutionNote: string | null;
+  workOrderId: string | null;
+  workOrderCode: string | null;
+  workOrderStatus: WorkOrderStatus | null;
+  version: number;
+}
+
+export interface AlertSummary {
+  critical: number;
+  warning: number;
+  active: number;
+  unacknowledged: number;
+}
+
+export interface AlertQuery {
+  statuses?: AlertStatus[];
+  severity?: AlertSeverity | null;
+  assetId?: string | null;
+  page?: number;
+  size?: number;
+}
+
+export interface AlertEvent {
+  type: AlertEventType;
+  alert: Alert;
+}
+
+// Maintenance service
+
+export type WorkOrderType = 'CORRECTIVE' | 'PREVENTIVE' | 'INSPECTION';
+export type WorkOrderPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type WorkOrderStatus = 'OPEN' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
+export type ActivityType = 'CREATED' | 'UPDATED' | 'STATUS_CHANGED' | 'ALERT_LINKED' | 'PART_USED' | 'PART_RETURNED';
+
+export const WORK_ORDER_TYPES: WorkOrderType[] = ['CORRECTIVE', 'PREVENTIVE', 'INSPECTION'];
+export const WORK_ORDER_PRIORITIES: WorkOrderPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+export const WORK_ORDER_STATUSES: WorkOrderStatus[] = ['OPEN', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED'];
+export const OPEN_WORK_ORDER_STATUSES: WorkOrderStatus[] = ['OPEN', 'IN_PROGRESS', 'ON_HOLD'];
+
+/** A row of the work order list. */
+export interface WorkOrderSummary {
+  id: string;
+  code: string;
+  assetId: string;
+  alertIds: string[];
+  type: WorkOrderType;
+  priority: WorkOrderPriority;
+  status: WorkOrderStatus;
+  title: string;
+  assignee: string | null;
+  dueDate: string | null;
+  overdue: boolean;
+  requestedBy: string;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface PartLine {
+  id: string;
+  partId: string;
+  partNumber: string;
+  partName: string;
+  unit: string;
+  quantity: number;
+  unitCost: number;
+  cost: number;
+  issuedBy: string;
+  issuedAt: string;
+}
+
+export interface WorkOrderActivity {
+  type: ActivityType;
+  message: string;
+  actor: string;
+  occurredAt: string;
+}
+
+export interface WorkOrder extends WorkOrderSummary {
+  /** Statuses this work order can move to now; the screen only offers these. */
+  nextStatuses: WorkOrderStatus[];
+  description: string | null;
+  updatedAt: string;
+  startedAt: string | null;
+  resolution: string | null;
+  parts: PartLine[];
+  partsCost: number;
+  activities: WorkOrderActivity[];
+  version: number;
+}
+
+export interface MaintenanceSummary {
+  byStatus: Record<WorkOrderStatus, number>;
+  open: number;
+  overdue: number;
+  urgentOpen: number;
+  mttrHours: number | null;
+  completedLast30Days: number;
+}
+
+export interface WorkOrderQuery {
+  statuses?: WorkOrderStatus[];
+  priority?: WorkOrderPriority | null;
+  assetId?: string | null;
+  q?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface CreateWorkOrderRequest {
+  assetId: string;
+  alertId?: string | null;
+  type: WorkOrderType;
+  priority: WorkOrderPriority;
+  title: string;
+  description?: string | null;
+  assignee?: string | null;
+  dueDate?: string | null;
+}
+
+// Inventory service
+
+export type PartCategory =
+  | 'MECHANICAL'
+  | 'ELECTRICAL'
+  | 'HYDRAULIC'
+  | 'PNEUMATIC'
+  | 'LUBRICANT'
+  | 'FILTER'
+  | 'SENSOR'
+  | 'CONSUMABLE';
+export type MovementType = 'RECEIPT' | 'ISSUE' | 'RETURN' | 'ADJUSTMENT';
+
+export const PART_CATEGORIES: PartCategory[] = [
+  'MECHANICAL',
+  'ELECTRICAL',
+  'HYDRAULIC',
+  'PNEUMATIC',
+  'LUBRICANT',
+  'FILTER',
+  'SENSOR',
+  'CONSUMABLE',
+];
+
+export interface SparePart {
+  id: string;
+  partNumber: string;
+  name: string;
+  description: string | null;
+  category: PartCategory;
+  unit: string;
+  quantityOnHand: number;
+  minimumStock: number;
+  lowStock: boolean;
+  unitCost: number;
+  stockValue: number;
+  location: string | null;
+  updatedAt: string;
+  version: number;
+}
+
+export interface StockMovement {
+  id: string;
+  partId: string;
+  partNumber: string;
+  partName: string;
+  unit: string;
+  type: MovementType;
+  quantity: number;
+  change: number;
+  quantityAfter: number;
+  unitCost: number;
+  workOrderId: string | null;
+  workOrderCode: string | null;
+  reference: string | null;
+  note: string | null;
+  performedBy: string;
+  performedAt: string;
+}
+
+export interface InventorySummary {
+  parts: number;
+  lowStock: number;
+  outOfStock: number;
+  stockValue: number;
+}
+
+export interface PartQuery {
+  q?: string;
+  category?: PartCategory | null;
+  lowStock?: boolean | null;
+  page?: number;
+  size?: number;
+}
+
+export interface CreatePartRequest {
+  partNumber: string;
+  name: string;
+  description?: string | null;
+  category: PartCategory;
+  unit: string;
+  minimumStock: number;
+  unitCost: number;
+  location?: string | null;
+}

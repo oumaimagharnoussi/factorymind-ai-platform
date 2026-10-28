@@ -38,7 +38,75 @@
     </mat-card>
   </section>
 
+  <section class="kpis">
+    <a class="kpi-link" routerLink="/alerts">
+      <mat-card class="kpi" [class.bad]="(alertSummary.value()?.critical ?? 0) > 0">
+        <span class="kpi-label">Open alerts</span>
+        <span class="kpi-value">{{ alertSummary.value()?.critical ?? 0 }} / {{ (alertSummary.value()?.critical ?? 0) + (alertSummary.value()?.warning ?? 0) }}</span>
+        <span class="kpi-hint">Critical / all · {{ alertSummary.value()?.unacknowledged ?? 0 }} not acknowledged</span>
+      </mat-card>
+    </a>
+    <a class="kpi-link" routerLink="/maintenance/orders">
+      <mat-card class="kpi" [class.warn]="(maintenanceSummary.value()?.urgentOpen ?? 0) > 0">
+        <span class="kpi-label">Open work orders</span>
+        <span class="kpi-value">{{ maintenanceSummary.value()?.open ?? 0 }}</span>
+        <span class="kpi-hint">{{ maintenanceSummary.value()?.urgentOpen ?? 0 }} urgent · {{ maintenanceSummary.value()?.overdue ?? 0 }} overdue</span>
+      </mat-card>
+    </a>
+    <mat-card class="kpi info">
+      <span class="kpi-label">MTTR (30 days)</span>
+      <span class="kpi-value">
+        @if (maintenanceSummary.value()?.mttrHours; as mttr) {
+          {{ mttr | number: '1.0-1' }} h
+        } @else {
+          –
+        }
+      </span>
+      <span class="kpi-hint">{{ maintenanceSummary.value()?.completedLast30Days ?? 0 }} orders completed</span>
+    </mat-card>
+    <a class="kpi-link" routerLink="/inventory" [queryParams]="{ lowStock: true }">
+      <mat-card class="kpi" [class.warn]="(inventorySummary.value()?.lowStock ?? 0) > 0">
+        <span class="kpi-label">Parts to reorder</span>
+        <span class="kpi-value">{{ inventorySummary.value()?.lowStock ?? 0 }}</span>
+        <span class="kpi-hint">{{ inventorySummary.value()?.outOfStock ?? 0 }} out of stock</span>
+      </mat-card>
+    </a>
+  </section>
+
   <section class="grid">
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Active alerts</mat-card-title>
+        <mat-card-subtitle>Debounced sensor alarms not resolved yet</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (activeAlerts.error()) {
+          <p class="empty">Alert service unavailable.</p>
+        } @else if (activeAlerts.value(); as alerts) {
+          @if (alerts.length === 0) {
+            <p class="empty">No open alert.</p>
+          } @else {
+            <ul class="attention">
+              @for (a of alerts; track a.id) {
+                <li>
+                  <a [routerLink]="['/assets', a.assetId]">
+                    <strong>{{ assets.code(a.assetId) }}</strong> {{ sensorLabel(a.sensorType) }}
+                  </a>
+                  <span class="where">
+                    {{ a.lastRaisedAt | date: 'short' }}
+                    @if (a.workOrderCode) {
+                      · <a [routerLink]="['/maintenance/orders', a.workOrderId]">{{ a.workOrderCode }}</a>
+                    }
+                  </span>
+                  <app-status-chip [value]="a.severity" />
+                </li>
+              }
+            </ul>
+          }
+        }
+      </mat-card-content>
+    </mat-card>
+
     <mat-card>
       <mat-card-header>
         <mat-card-title>Needs attention</mat-card-title>

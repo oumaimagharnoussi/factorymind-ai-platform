@@ -46,12 +46,34 @@ export const routes: Routes = [
         loadComponent: () => import('./features/monitoring/live-monitoring').then((m) => m.LiveMonitoring),
       },
       {
+        path: 'alerts',
+        title: 'Alerts · FactoryMind AI',
+        loadComponent: () => import('./features/alerts/alert-list').then((m) => m.AlertList),
+      },
+      {
         path: 'maintenance/orders',
-        ...soon('Work orders', 'weeks 8–9', 'Maintenance orders from OPEN to IN_PROGRESS to COMPLETED, with parts used and root cause.'),
+        title: 'Work orders · FactoryMind AI',
+        loadComponent: () => import('./features/maintenance/work-order-list').then((m) => m.WorkOrderList),
+      },
+      {
+        path: 'maintenance/orders/new',
+        title: 'New work order · FactoryMind AI',
+        loadComponent: () => import('./features/maintenance/work-order-form').then((m) => m.WorkOrderForm),
+      },
+      {
+        path: 'maintenance/orders/:id',
+        title: 'Work order · FactoryMind AI',
+        loadComponent: () => import('./features/maintenance/work-order-detail').then((m) => m.WorkOrderDetail),
       },
       {
         path: 'inventory',
-        ...soon('Spare parts', 'weeks 8–9', 'Spare parts catalogue, stock levels and stock movements linked to work orders.'),
+        title: 'Spare parts · FactoryMind AI',
+        loadComponent: () => import('./features/inventory/part-list').then((m) => m.PartList),
+      },
+      {
+        path: 'inventory/:id',
+        title: 'Spare part · FactoryMind AI',
+        loadComponent: () => import('./features/inventory/part-detail').then((m) => m.PartDetail),
       },
       {
         path: 'ai-insights',
