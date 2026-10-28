@@ -77,7 +77,8 @@ export const routes: Routes = [
       },
       {
         path: 'ai-insights',
-        ...soon('AI risk center', 'weeks 10–11', 'Anomaly detection and 7-day failure-risk scores from the Python ML service, with explanations.'),
+        title: 'AI risk center · FactoryMind AI',
+        loadComponent: () => import('./features/insights/risk-center').then((m) => m.RiskCenter),
       },
       {
         path: 'copilot',

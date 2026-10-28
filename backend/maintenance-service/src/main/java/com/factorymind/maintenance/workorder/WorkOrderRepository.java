@@ -22,6 +22,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID>, Jpa
             order by w.createdAt""")
     List<WorkOrder> findOpenForAlertsOn(UUID assetId, Collection<WorkOrderStatus> statuses);
 
+    boolean existsByAssetIdAndStatusIn(UUID assetId, Collection<WorkOrderStatus> statuses);
+
     @Query(value = "select nextval('work_order_number_seq')", nativeQuery = true)
     long nextNumber();
 

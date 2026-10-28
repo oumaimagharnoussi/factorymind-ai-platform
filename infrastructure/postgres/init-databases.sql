@@ -8,3 +8,4 @@ SELECT 'CREATE DATABASE telemetry_db' WHERE NOT EXISTS (SELECT FROM pg_database 
 SELECT 'CREATE DATABASE alert_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'alert_db')\gexec
 SELECT 'CREATE DATABASE maintenance_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'maintenance_db')\gexec
 SELECT 'CREATE DATABASE inventory_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'inventory_db')\gexec
+SELECT 'CREATE DATABASE insights_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'insights_db')\gexec

@@ -5,6 +5,7 @@ import com.factorymind.maintenance.common.ConflictException;
 import com.factorymind.maintenance.common.NotFoundException;
 import com.factorymind.maintenance.common.PageResponse;
 import com.factorymind.maintenance.inventory.InventoryClient;
+import com.factorymind.maintenance.risk.RiskLevelChangedMessage;
 import com.factorymind.maintenance.inventory.IssuedStock;
 import com.factorymind.maintenance.workorder.WorkOrderDtos.CreateWorkOrderRequest;
 import com.factorymind.maintenance.workorder.WorkOrderDtos.MaintenanceSummary;
@@ -37,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkOrderService {
 
     static final String ALERT_SERVICE = "alert-service";
+    static final String AI_INSIGHTS = "ai-insights";
     private static final List<WorkOrderStatus> OPEN_STATUSES =
             List.of(WorkOrderStatus.OPEN, WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.ON_HOLD);
 
@@ -159,6 +161,31 @@ public class WorkOrderService {
                 null, today(), ALERT_SERVICE, clock.instant()));
         log.info("Opened {} for critical alert {} on machine {}", workOrder.getCode(), alert.alertId(), alert.assetId());
         announce(ActivityType.CREATED, workOrder, ALERT_SERVICE);
+    }
+
+    /**
+     * The failure-risk model expects a machine to reach a critical limit soon, usually before any alert.
+     * An inspection is planned so someone looks at the machine while it still runs. If the machine already
+     * has an open work order of any kind, that job covers it and nothing is added; this also makes a
+     * redelivered event harmless, since it finds the inspection it opened the first time.
+     */
+    @Transactional
+    public void planInspectionForRisk(RiskLevelChangedMessage risk) {
+        if (workOrders.existsByAssetIdAndStatusIn(risk.assetId(), OPEN_STATUSES)) {
+            log.info("Machine {} rated HIGH risk; an open work order already covers it", risk.assetId());
+            return;
+        }
+        String sensor = risk.mainSensorType().replace('_', ' ').toLowerCase(Locale.ROOT);
+        String description = "Planned automatically by the failure-risk model (" + risk.modelVersion() + "): "
+                + Math.round(risk.riskScore() * 100) + "% probability that the " + sensor
+                + " reaches its critical limit within 24 h. " + String.join("; ", risk.drivers())
+                + ". Inspect the machine before it fails and record what was found.";
+        WorkOrder workOrder = workOrders.save(new WorkOrder(nextCode(), risk.assetId(), null,
+                WorkOrderType.INSPECTION, WorkOrderPriority.HIGH, "Predicted " + sensor + " failure",
+                description.length() > 2000 ? description.substring(0, 2000) : description,
+                null, today(), AI_INSIGHTS, clock.instant()));
+        log.info("Planned {} for machine {} (risk {})", workOrder.getCode(), risk.assetId(), risk.riskScore());
+        announce(ActivityType.CREATED, workOrder, AI_INSIGHTS);
     }
 
     public MaintenanceSummary summary() {

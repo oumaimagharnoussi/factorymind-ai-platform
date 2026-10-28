@@ -15,7 +15,7 @@ a Python ML service and Power BI analytics.
 
 ![Work order](docs/demo/work-order.png)
 
-## What works today (phases 1–4)
+## What works today (phases 1–5)
 
 | Area | Status |
 |---|---|
@@ -32,9 +32,11 @@ a Python ML service and Power BI analytics.
 | Alert service: debounced alerts from sensor status changes, acknowledge / resolve, live stream | ✅ |
 | Maintenance service: work orders (auto-created from critical alerts), status workflow, parts used, history, MTTR | ✅ |
 | Inventory service: spare parts, stock movements ledger, receipts, stock counts, low-stock view | ✅ |
+| Failure-risk model (Python, scikit-learn, FastAPI) trained on simulated run-to-failure data, with a model card | ✅ |
+| AI insights service: live risk per machine from Kafka telemetry, inspection work order when a machine turns HIGH | ✅ |
+| Spring AI: maintenance report per machine and an assistant that answers with tool calls on live data (Claude or Ollama) | ✅ |
 | Preventive maintenance plans | Later |
-| Anomaly detection and failure-risk model (Python, scikit-learn) | Weeks 10–11 |
-| Maintenance copilot (Spring AI + RAG), Power BI reports | Weeks 12–13 |
+| Maintenance copilot on machine manuals (Spring AI + RAG), Power BI reports | Weeks 12–13 |
 | Observability (Prometheus, Grafana) | Weeks 14–15 |
 
 ## Architecture
@@ -49,14 +51,20 @@ API Gateway (8080) ─┬─► asset-service (8081) ──────► Postg
                     ├─► alert-service (8083) ──────► PostgreSQL alert_db
                     ├─► maintenance-service (8084) ► PostgreSQL maintenance_db
                     │        │ REST: issue / return parts (token relayed)
-                    └─► inventory-service (8086) ──► PostgreSQL inventory_db
+                    ├─► inventory-service (8086) ──► PostgreSQL inventory_db
+                    └─► ai-insights-service (8087) ► PostgreSQL insights_db
+                             │ REST /predict           │ Spring AI (optional)
+                             ▼                         ▼
+                     ml-service (8090, Python)   Claude API or Ollama
 
 Kafka (9092)
   asset.sensor-definitions   asset ──► telemetry
   telemetry.readings         simulator / plant gateways ──► telemetry
   telemetry.sensor-status    telemetry ──► alert (debounce)
   alert.alerts               alert ──► maintenance (critical alert opens a work order)
-  maintenance.work-orders    maintenance ──► alert (acknowledge, resolve when completed)
+  maintenance.work-orders    maintenance ──► alert (acknowledge, resolve when completed), ai-insights
+  ai.risk-levels             ai-insights ──► maintenance (HIGH risk plans an inspection)
+  (ai-insights also reads sensor-definitions, readings and alerts)
 ```
 
 Each service owns its database; services talk over REST for queries and Kafka for events.
@@ -66,6 +74,10 @@ changes level. See [ADR 0003](docs/adr/0003-kafka-telemetry.md).
 A status change then becomes an alert once it lasts 15 s (and clears after 30 s back to normal); a critical
 alert opens an urgent work order, or joins the open one of the same machine; the technician books spare parts
 on it, which takes them out of stock. See [ADR 0004](docs/adr/0004-alerts-maintenance-inventory.md).
+Every 10 s, ai-insights-service sends each machine's latest readings to the Python model, which returns the
+probability that a sensor reaches its critical limit within 24 h and the reasons; a machine that turns HIGH gets
+an inspection work order, usually minutes before the first alert in the demo. See
+[ADR 0005](docs/adr/0005-ai-insights-ml.md).
 Decisions are recorded in [`docs/adr`](docs/adr).
 
 ## Security
@@ -102,7 +114,8 @@ Keycloak admin console: http://localhost:8180/auth/admin (`KEYCLOAK_ADMIN` / `KE
 ## Tech stack
 
 Java 25 · Spring Boot 4.0.9 · Spring Cloud 2025.1.4 (Gateway) · Spring for Apache Kafka · Apache Kafka 4.3 (KRaft) ·
-Spring Data JPA · Flyway · PostgreSQL 17 · Server-Sent Events ·
+Spring Data JPA · Flyway · PostgreSQL 17 · Server-Sent Events · Spring AI 2.0.1 (Anthropic Claude, Ollama, tool calling) ·
+Python 3.13 · scikit-learn 1.9 · FastAPI · pytest ·
 Angular 22 (standalone components, signals, `rxResource`, reactive forms, Angular Material) · Vitest ·
 JUnit 5 · Mockito · Testcontainers · Docker Compose · GitHub Actions.
 
@@ -121,6 +134,13 @@ docker compose up --build
 Open http://localhost:4200 and sign in with one of the demo accounts. **Live monitoring** shows the simulated
 sensors; M-102 and M-104 slowly degrade to critical and recover every 6 minutes. A few seconds after they
 turn critical, **Alerts** shows the alarms and **Work orders** gets an urgent order for each machine.
+**AI risk center** flags them earlier: their risk turns HIGH while the readings are still below the warning
+limit, and an inspection work order appears before the alert.
+
+Reports and the assistant use a language model only if you choose one in `.env`:
+`AI_CHAT_PROVIDER=anthropic` with `ANTHROPIC_API_KEY`, or `AI_CHAT_PROVIDER=ollama` with
+`docker compose --profile ollama up -d` and `docker compose exec ollama ollama pull llama3.2` (free, local).
+Without one, reports are rule-based and the assistant is off; risk scoring never needs a language model.
 
 | URL | What |
 |---|---|
@@ -130,9 +150,11 @@ turn critical, **Alerts** shows the alarms and **Work orders** gets an urgent or
 | http://localhost:8083/swagger-ui.html | alert-service API |
 | http://localhost:8084/swagger-ui.html | maintenance-service API |
 | http://localhost:8086/swagger-ui.html | inventory-service API |
+| http://localhost:8087/swagger-ui.html | ai-insights-service API |
+| http://localhost:8090/docs | Python model API (internal; open in dev only) |
 
 Already ran an earlier phase? `docker compose up --build` is enough: the `db-init` container creates
-the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`) in the existing Postgres volume.
+the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`, `insights_db`) in the existing Postgres volume.
 
 ### For development
 
@@ -146,7 +168,14 @@ SIMULATOR_ENABLED=true ./mvnw -pl telemetry-service spring-boot:run
 ./mvnw -pl alert-service spring-boot:run
 ./mvnw -pl inventory-service spring-boot:run
 ./mvnw -pl maintenance-service spring-boot:run
+./mvnw -pl ai-insights-service spring-boot:run
 ./mvnw -pl api-gateway spring-boot:run
+
+# Python model (Python 3.13)
+cd ml/predictive-maintenance
+python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # Windows: .venv\Scripts\pip
+python -m factorymind_ml.train --out model
+uvicorn factorymind_ml.api:app --port 8090
 
 # Frontend (Node 22.22.3+ or 24)
 cd frontend/factorymind-web
@@ -165,6 +194,7 @@ Signed-in call from a terminal: the web client has no password grant, so take th
 ```bash
 cd backend && ./mvnw verify                  # needs Docker for the Testcontainers tests (PostgreSQL, Kafka)
 cd frontend/factorymind-web && npx ng test --watch=false
+cd ml/predictive-maintenance && python -m pytest -q
 ```
 
 ## Deploy
@@ -240,12 +270,23 @@ Errors use RFC 9457 problem details, for example:
 { "status": 409, "title": "Conflict", "detail": "Asset code 'M-104' is already used" }
 ```
 
+## API (ai-insights-service, through the gateway)
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/api/insights/risks` | Latest failure risk of every machine, highest first, with per-sensor reasons |
+| GET | `/api/insights/risks/{assetId}`, `/history?minutes=` | One machine, and its risk over time |
+| GET | `/api/insights/model` | Model card: training data, feature importances, metrics against the warning rule |
+| GET | `/api/insights/assistant` | Whether a language model is configured, and which |
+| POST | `/api/insights/assets/{assetId}/report` | Maintenance report (language model, or rule-based), ENGINEER/ADMIN |
+| POST | `/api/insights/ask` | `{"question"}`: answer from live data via tool calls, ENGINEER/ADMIN |
+
 ## Repository layout
 
 ```
-backend/          Maven multi-module: asset, telemetry, alert, maintenance, inventory services and api-gateway
+backend/          Maven multi-module: asset, telemetry, alert, maintenance, inventory, ai-insights services and api-gateway
 frontend/         Angular app (factorymind-web)
-ai/               Python ML services (phase 3)
+ml/               Python failure-risk model: features, simulated training data, training, FastAPI service
 analytics/        Warehouse, ETL and Power BI (phase 4)
 infrastructure/   Database init script, Keycloak realm, Caddy; later Prometheus, Grafana
 docs/             ADRs, architecture notes, screenshots

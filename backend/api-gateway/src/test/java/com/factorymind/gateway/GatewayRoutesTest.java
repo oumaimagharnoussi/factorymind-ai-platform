@@ -41,6 +41,11 @@ class GatewayRoutesTest {
         assertThat(uriOf("inventory-service")).isEqualTo("http://localhost:8086");
     }
 
+    @Test
+    void insightsRouteGoesToTheJavaServiceNotToThePythonModel() {
+        assertThat(uriOf("ai-insights-service")).isEqualTo("http://localhost:8087");
+    }
+
     private String uriOf(String routeId) {
         Route route = routes.getRoutes().filter(r -> r.getId().equals(routeId)).blockFirst();
         assertThat(route).as("route %s", routeId).isNotNull();

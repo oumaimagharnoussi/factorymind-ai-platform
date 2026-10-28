@@ -10,6 +10,7 @@ import { forkJoin, map } from 'rxjs';
 import { AlertApi } from '../../core/api/alert-api';
 import { AssetApi } from '../../core/api/asset-api';
 import { AssetDirectory } from '../../core/api/asset-directory';
+import { InsightsApi } from '../../core/api/insights-api';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { MaintenanceApi } from '../../core/api/maintenance-api';
 import { CRITICALITIES } from '../../core/api/models';
@@ -28,6 +29,7 @@ export class Dashboard {
   private readonly alertApi = inject(AlertApi);
   private readonly maintenanceApi = inject(MaintenanceApi);
   private readonly inventoryApi = inject(InventoryApi);
+  private readonly insightsApi = inject(InsightsApi);
   protected readonly assets = inject(AssetDirectory);
 
   protected readonly criticalities = CRITICALITIES;
@@ -48,6 +50,10 @@ export class Dashboard {
   protected readonly alertSummary = rxResource({ stream: () => this.alertApi.summary() });
   protected readonly maintenanceSummary = rxResource({ stream: () => this.maintenanceApi.summary() });
   protected readonly inventorySummary = rxResource({ stream: () => this.inventoryApi.summary() });
+  protected readonly risks = rxResource({ stream: () => this.insightsApi.risks() });
+
+  /** Machines the failure-risk model rates HIGH, riskiest first. */
+  protected readonly highRisk = computed(() => (this.risks.value() ?? []).filter((r) => r.riskLevel === 'HIGH'));
 
   /** Most recently raised alerts that are not resolved yet. */
   protected readonly activeAlerts = rxResource({

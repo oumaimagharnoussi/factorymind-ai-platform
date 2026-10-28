@@ -1,0 +1,242 @@
+<header class="page-header">
+  <div>
+    <h1>AI risk center</h1>
+    <p class="subtitle">
+      Every 10 seconds the latest readings of each machine go to a scikit-learn model that estimates the
+      probability that one of its sensors reaches its critical limit within
+      {{ modelCard.value()?.horizonHours ?? 24 }} hours. A machine that turns HIGH gets an inspection work
+      order, usually before any alert.
+    </p>
+  </div>
+</header>
+
+@if (errorMessage(); as message) {
+  <p class="error-banner" role="alert"><mat-icon inline>error</mat-icon> {{ message }}</p>
+}
+
+<section class="counters">
+  <div class="counter bad"><strong>{{ counts().HIGH }}</strong> high risk</div>
+  <div class="counter warn"><strong>{{ counts().MEDIUM }}</strong> medium</div>
+  <div class="counter"><strong>{{ counts().LOW }}</strong> low</div>
+  @if (modelCard.value(); as card) {
+    <div class="counter model" [matTooltip]="card.algorithm + ', trained ' + (card.trainedAt | date: 'medium')">
+      model <code>{{ card.modelVersion }}</code>
+    </div>
+  }
+</section>
+
+<div class="layout">
+  <mat-card class="machines">
+    <mat-card-header>
+      <mat-card-title>Machines by failure risk</mat-card-title>
+      <mat-card-subtitle>Highest first · select one for details</mat-card-subtitle>
+    </mat-card-header>
+    @if (risks.isLoading() && !risks.value()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    <mat-card-content>
+      @for (risk of risks.value() ?? []; track risk.assetId) {
+        <button
+          type="button"
+          class="machine"
+          [class.selected]="risk.assetId === selected()?.assetId"
+          (click)="select(risk)"
+        >
+          <span class="who">
+            <strong>{{ assets.code(risk.assetId) }}</strong>
+            <span class="secondary">{{ assets.name(risk.assetId) }}</span>
+          </span>
+          <span class="bar" [attr.aria-label]="'Failure risk ' + (risk.riskScore | percent)">
+            <span class="fill" [class]="risk.riskLevel" [style.width.%]="risk.riskScore * 100"></span>
+          </span>
+          <span class="score">{{ risk.riskScore | percent }}</span>
+          <app-status-chip [value]="risk.riskLevel" />
+          <span class="why secondary">
+            {{ sensorLabel(risk.mainSensorType) }} · {{ risk.sensors[0].drivers[0] }}
+          </span>
+        </button>
+      } @empty {
+        @if (!risks.isLoading()) {
+          <p class="empty">
+            No machine scored yet. The model needs a couple of minutes of readings; check that telemetry is
+            flowing on the Live monitoring page.
+          </p>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+
+  @if (selected(); as risk) {
+    <mat-card class="detail">
+      <mat-card-header>
+        <mat-card-title>
+          <a [routerLink]="['/assets', risk.assetId]">{{ assets.code(risk.assetId) }}</a>
+          {{ assets.name(risk.assetId) }}
+        </mat-card-title>
+        <mat-card-subtitle>
+          {{ risk.riskScore | percent }} risk within {{ risk.horizonHours }} h · assessed
+          {{ risk.assessedAt | date: 'mediumTime' }}
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="history">
+          <span class="secondary">Risk, last 30 minutes (dashed: medium 40%, high 70%)</span>
+          <app-sparkline [values]="historyValues()" [warning]="40" [critical]="70" [tone]="risk.riskLevel === 'HIGH' ? 'CRITICAL' : risk.riskLevel === 'MEDIUM' ? 'WARNING' : 'NORMAL'" />
+        </div>
+
+        <table class="sensors">
+          <thead>
+            <tr>
+              <th>Sensor</th>
+              <th>Risk</th>
+              <th>Now</th>
+              <th>Trend</th>
+              <th>Critical in</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (sensor of risk.sensors; track sensor.sensorType) {
+              <tr>
+                <td>
+                  {{ sensorLabel(sensor.sensorType) }}
+                  <div class="secondary">{{ sensor.drivers.join(' · ') }}</div>
+                </td>
+                <td><app-status-chip [value]="sensor.riskLevel" /> {{ sensor.failureProbability | percent }}</td>
+                <td class="num">{{ sensor.currentValue | number: '1.0-2' }} {{ sensor.unit }}</td>
+                <td class="num">{{ sensor.trendPerHour > 0 ? '+' : '' }}{{ sensor.trendPerHour | number: '1.0-2' }} {{ sensor.unit }}/h</td>
+                <td class="num">{{ timeToCritical(sensor.hoursToCritical) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        @if (canUseLanguageModel()) {
+          <div class="report-actions">
+            <button mat-flat-button (click)="writeReport(risk.assetId)" [disabled]="writingReport()">
+              <mat-icon>description</mat-icon> Write maintenance report
+            </button>
+            @if (writingReport()) {
+              <span class="secondary">Writing…</span>
+            }
+          </div>
+          @if (reportError(); as message) {
+            <p class="error">{{ message }}</p>
+          }
+          @if (reportHtml(); as html) {
+            <div class="report">
+              <div class="markdown" [innerHTML]="html"></div>
+              <p class="secondary">
+                Written by {{ generatedByLabel(report()!.generatedBy) }} at {{ report()!.generatedAt | date: 'mediumTime' }}.
+                Check it against the data above before acting.
+              </p>
+            </div>
+          }
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>
+
+@if (canUseLanguageModel()) {
+  <mat-card class="assistant">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>smart_toy</mat-icon>
+      <mat-card-title>Ask FactoryMind</mat-card-title>
+      <mat-card-subtitle>
+        @if (assistant.value(); as status) {
+          @if (status.enabled) {
+            {{ status.model }} · looks up live risks, alerts and work orders before it answers; it cannot change anything
+          } @else {
+            Off: no language model is configured (set AI_CHAT_PROVIDER to anthropic or ollama)
+          }
+        }
+      </mat-card-subtitle>
+    </mat-card-header>
+    @if (assistant.value()?.enabled) {
+      <mat-card-content>
+        <mat-chip-set aria-label="Suggested questions">
+          @for (suggestion of suggestions; track suggestion) {
+            <mat-chip (click)="ask(suggestion)" [disabled]="asking()">{{ suggestion }}</mat-chip>
+          }
+        </mat-chip-set>
+        <form class="ask" (ngSubmit)="ask()">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Your question</mat-label>
+            <input matInput name="question" maxlength="500" [(ngModel)]="question" [disabled]="asking()" />
+          </mat-form-field>
+          <button mat-flat-button type="submit" [disabled]="asking() || !question.trim()">Ask</button>
+        </form>
+        @if (asking()) {
+          <mat-progress-bar mode="indeterminate" />
+        }
+        @for (exchange of exchanges(); track $index) {
+          <div class="exchange">
+            <p class="question"><mat-icon inline>person</mat-icon> {{ exchange.question }}</p>
+            @if (exchange.answer; as answer) {
+              <div class="markdown" [innerHTML]="answerHtml(answer)"></div>
+            }
+            @if (exchange.error; as message) {
+              <p class="error">{{ message }}</p>
+            }
+          </div>
+        }
+      </mat-card-content>
+    }
+  </mat-card>
+}
+
+@if (modelCard.value(); as card) {
+  <mat-card class="model-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>model_training</mat-icon>
+      <mat-card-title>Model card</mat-card-title>
+      <mat-card-subtitle>
+        {{ card.algorithm }} · {{ card.trainingData.windows | number }} windows from
+        {{ card.trainingData.sensorLives | number }} simulated sensor lives · tested on machines it never saw
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content class="model-grid">
+      <table class="metrics">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Precision</th>
+            <th>Recall</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ML model</td>
+            <td class="num">{{ card.metrics.model.precision | percent }}</td>
+            <td class="num">{{ card.metrics.model.recall | percent }}</td>
+          </tr>
+          <tr>
+            <td>Rule "above warning limit"</td>
+            <td class="num">{{ card.metrics.warningThresholdRule.precision | percent }}</td>
+            <td class="num">{{ card.metrics.warningThresholdRule.recall | percent }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <ul class="facts">
+        <li>ROC AUC <strong>{{ card.metrics.model.rocAuc | number: '1.2-2' }}</strong></li>
+        @if (card.metrics.earlyDetectionRate !== null) {
+          <li>
+            <strong>{{ card.metrics.earlyDetectionRate | percent }}</strong> of upcoming failures flagged while every
+            sensor was still below its warning limit (the rule sees none of them)
+          </li>
+        }
+        <li>Brier score <strong>{{ card.metrics.model.brierScore | number: '1.3-3' }}</strong> (lower is better calibrated)</li>
+      </ul>
+      <div class="importances">
+        <span class="secondary">What the model looks at</span>
+        @for (feature of importances(); track feature.name) {
+          <div class="importance">
+            <span>{{ feature.name }}</span>
+            <span class="bar"><span class="fill" [style.width.%]="feature.value * 100 / importances()[0].value"></span></span>
+            <span class="num">{{ feature.value | percent: '1.0-0' }}</span>
+          </div>
+        }
+      </div>
+    </mat-card-content>
+  </mat-card>
+}

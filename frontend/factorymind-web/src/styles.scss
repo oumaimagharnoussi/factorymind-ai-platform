@@ -79,3 +79,22 @@ h1 {
   background: var(--fm-bad-bg);
   color: var(--fm-bad);
 }
+
+/* Text rendered by renderMarkdown (reports and assistant answers), bound with [innerHTML]. */
+.markdown {
+  line-height: 1.5;
+
+  :is(h3, h4, h5) {
+    margin: 4px 0 8px;
+  }
+
+  p {
+    margin: 6px 0;
+  }
+
+  ul,
+  ol {
+    margin: 6px 0;
+    padding-left: 22px;
+  }
+}

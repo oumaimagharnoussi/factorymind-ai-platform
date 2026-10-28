@@ -379,3 +379,81 @@ export interface CreatePartRequest {
   unitCost: number;
   location?: string | null;
 }
+
+/** Probability that a sensor reaches its critical limit within the model's horizon: LOW < 0.4 ≤ MEDIUM < 0.7 ≤ HIGH. */
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface SensorRisk {
+  sensorType: SensorType;
+  unit: string | null;
+  currentValue: number;
+  failureProbability: number;
+  riskLevel: RiskLevel;
+  /** Change per hour, in the sensor's unit. */
+  trendPerHour: number;
+  /** When the trend meets the critical limit; null when the sensor is not clearly rising. */
+  hoursToCritical: number | null;
+  /** Plain-language reasons, worst first. */
+  drivers: string[];
+}
+
+export interface MachineRisk {
+  assetId: string;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  horizonHours: number;
+  mainSensorType: SensorType;
+  hoursToCritical: number | null;
+  sensors: SensorRisk[];
+  modelVersion: string;
+  assessedAt: string;
+}
+
+export interface RiskPoint {
+  assessedAt: string;
+  riskScore: number;
+  riskLevel: RiskLevel;
+}
+
+export interface BinaryMetrics {
+  precision: number;
+  recall: number;
+}
+
+export interface ModelCard {
+  modelVersion: string;
+  algorithm: string;
+  trainedAt: string;
+  horizonHours: number;
+  decisionThreshold: number;
+  trainingData: { source: string; sensorLives: number; windows: number; positiveShare: number; testWindows: number };
+  features: string[];
+  featureImportances: Record<string, number>;
+  metrics: {
+    model: BinaryMetrics & { rocAuc: number; averagePrecision: number; brierScore: number };
+    warningThresholdRule: BinaryMetrics;
+    /** Share of upcoming failures flagged while every sensor was still below its warning limit. */
+    earlyDetectionRate: number | null;
+  };
+}
+
+export interface MachineReport {
+  assetId: string;
+  machine: string;
+  /** Markdown. */
+  text: string;
+  /** "anthropic:claude-sonnet-5-5", "ollama:llama3.2" or "rules". */
+  generatedBy: string;
+  generatedAt: string;
+}
+
+export interface AssistantStatus {
+  enabled: boolean;
+  model: string;
+}
+
+export interface AssistantAnswer {
+  answer: string;
+  generatedBy: string;
+  answeredAt: string;
+}

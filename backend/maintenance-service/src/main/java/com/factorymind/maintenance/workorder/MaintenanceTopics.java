@@ -1,12 +1,13 @@
 package com.factorymind.maintenance.workorder;
 
 import com.factorymind.maintenance.alert.AlertListener;
+import com.factorymind.maintenance.risk.RiskLevelListener;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
 
-/** The topic maintenance-service owns, and the dead-letter topic of the one it reads. */
+/** The topic maintenance-service owns, and the dead-letter topics of the ones it reads. */
 @Configuration(proxyBeanMethods = false)
 public class MaintenanceTopics {
 
@@ -22,5 +23,10 @@ public class MaintenanceTopics {
     @Bean
     NewTopic alertsDeadLetterTopic() {
         return TopicBuilder.name(AlertListener.TOPIC + "-dlt").partitions(PARTITIONS).replicas(1).build();
+    }
+
+    @Bean
+    NewTopic riskLevelsDeadLetterTopic() {
+        return TopicBuilder.name(RiskLevelListener.TOPIC + "-dlt").partitions(PARTITIONS).replicas(1).build();
     }
 }

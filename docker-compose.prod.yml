@@ -164,6 +164,34 @@ services:
       db-init:
         condition: service_completed_successfully
 
+  ml-service:
+    image: ${IMAGE_PREFIX}/ml-service:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+
+  ai-insights-service:
+    image: ${IMAGE_PREFIX}/ai-insights-service:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      INSIGHTS_DB_URL: jdbc:postgresql://postgres:5432/insights_db
+      INSIGHTS_DB_USER: ${POSTGRES_USER}
+      INSIGHTS_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ML_SERVICE_URL: http://ml-service:8090
+      ASSET_SERVICE_URL: http://asset-service:8081
+      # The public demo writes rule-based reports unless a key is set in .env.
+      AI_CHAT_PROVIDER: ${AI_CHAT_PROVIDER:-none}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      KEYCLOAK_ISSUER_URI: https://${DOMAIN}/auth/realms/factorymind
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
+
   api-gateway:
     image: ${IMAGE_PREFIX}/api-gateway:${IMAGE_TAG:-latest}
     restart: unless-stopped
@@ -173,6 +201,7 @@ services:
       ALERT_SERVICE_URL: http://alert-service:8083
       MAINTENANCE_SERVICE_URL: http://maintenance-service:8084
       INVENTORY_SERVICE_URL: http://inventory-service:8086
+      AI_INSIGHTS_SERVICE_URL: http://ai-insights-service:8087
       CORS_ALLOWED_ORIGINS: https://${DOMAIN}
       KEYCLOAK_ISSUER_URI: https://${DOMAIN}/auth/realms/factorymind
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
@@ -182,6 +211,7 @@ services:
       - alert-service
       - maintenance-service
       - inventory-service
+      - ai-insights-service
 
   web:
     image: ${IMAGE_PREFIX}/web:${IMAGE_TAG:-latest}

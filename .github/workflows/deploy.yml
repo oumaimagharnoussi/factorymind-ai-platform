@@ -46,6 +46,12 @@ jobs:
           - name: inventory-service
             context: backend
             module: inventory-service
+          - name: ai-insights-service
+            context: backend
+            module: ai-insights-service
+          - name: ml-service
+            context: ml/predictive-maintenance
+            module: ""
           - name: api-gateway
             context: backend
             module: api-gateway

@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.factorymind.maintenance.alert.AlertListener;
 import com.factorymind.maintenance.inventory.InventoryClient;
 import com.factorymind.maintenance.inventory.IssuedStock;
+import com.factorymind.maintenance.risk.RiskLevelListener;
 import com.factorymind.maintenance.workorder.MaintenanceTopics;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
@@ -35,7 +36,6 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -76,15 +76,17 @@ class MaintenanceIntegrationTest {
     @MockitoBean
     InventoryClient inventory;
 
-    @Value("${spring.kafka.bootstrap-servers}")
-    String bootstrapServers;
-
-    /** Owned by alert-service in real life; this test plays it. */
+    /** Owned by alert-service and ai-insights-service in real life; this test plays them. */
     @TestConfiguration
     static class UpstreamTopics {
         @Bean
         NewTopic alerts() {
             return TopicBuilder.name(AlertListener.TOPIC).partitions(3).replicas(1).build();
+        }
+
+        @Bean
+        NewTopic riskLevels() {
+            return TopicBuilder.name(RiskLevelListener.TOPIC).partitions(3).replicas(1).build();
         }
     }
 
@@ -184,12 +186,37 @@ class MaintenanceIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
+    @Test
+    void aMachineRatedHighRiskGetsOneInspection() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        String risk = """
+                {"assetId": "%s", "previousLevel": "MEDIUM", "riskLevel": "HIGH", "riskScore": 0.91,
+                 "mainSensorType": "VIBRATION", "hoursToCritical": 0.3,
+                 "drivers": ["trend reaches the critical limit in about 18 min"], "modelVersion": "rf-24h-test",
+                 "assessedAt": "2026-10-28T10:00:00Z"}""".formatted(assetId);
+        send(RiskLevelListener.TOPIC, risk);
+        send(RiskLevelListener.TOPIC, risk); // Kafka may deliver twice
+
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                mvc.perform(get("/api/maintenance/work-orders").param("assetId", assetId.toString()).with(engineer))
+                        .andExpect(jsonPath("$.totalElements").value(1))
+                        .andExpect(jsonPath("$.content[0].type").value("INSPECTION"))
+                        .andExpect(jsonPath("$.content[0].title").value("Predicted vibration failure")));
+        Thread.sleep(1000);
+        mvc.perform(get("/api/maintenance/work-orders").param("assetId", assetId.toString()).with(engineer))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
     private void send(String json) {
+        send(AlertListener.TOPIC, json);
+    }
+
+    private void send(String topic, String json) {
         try (var producer = new KafkaProducer<String, String>(Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers(),
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
                 ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class))) {
-            producer.send(new ProducerRecord<>(AlertListener.TOPIC, UUID.randomUUID().toString(), json)).get();
+            producer.send(new ProducerRecord<>(topic, UUID.randomUUID().toString(), json)).get();
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -198,7 +225,7 @@ class MaintenanceIntegrationTest {
     private List<String> workOrderEvents(UUID assetId) {
         List<String> types = new ArrayList<>();
         try (var consumer = new KafkaConsumer<String, String>(Map.of(
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers(),
                 ConsumerConfig.GROUP_ID_CONFIG, "test-" + UUID.randomUUID(),
                 ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
                 ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,

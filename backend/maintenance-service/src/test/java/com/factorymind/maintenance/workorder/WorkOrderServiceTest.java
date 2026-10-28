@@ -14,6 +14,7 @@ import com.factorymind.maintenance.alert.AlertEventMessage;
 import com.factorymind.maintenance.common.BusinessRuleException;
 import com.factorymind.maintenance.inventory.InventoryClient;
 import com.factorymind.maintenance.inventory.IssuedStock;
+import com.factorymind.maintenance.risk.RiskLevelChangedMessage;
 import com.factorymind.maintenance.workorder.WorkOrderDtos.UsePartRequest;
 import com.factorymind.maintenance.workorder.WorkOrderDtos.WorkOrderResponse;
 import java.math.BigDecimal;
@@ -133,5 +134,44 @@ class WorkOrderServiceTest {
                 });
         assertThat(published).singleElement().isInstanceOfSatisfying(WorkOrderEventMessage.class,
                 event -> assertThat(event.alertIds()).containsExactlyInAnyOrder(first, second));
+    }
+
+    @Test
+    void aMachineRatedHighRiskGetsOneInspectionBeforeItFails() {
+        UUID assetId = UUID.randomUUID();
+        when(workOrders.existsByAssetIdAndStatusIn(eq(assetId), any())).thenReturn(false);
+        when(workOrders.nextNumber()).thenReturn(43L);
+        when(workOrders.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.planInspectionForRisk(highRisk(assetId));
+
+        ArgumentCaptor<WorkOrder> saved = ArgumentCaptor.forClass(WorkOrder.class);
+        verify(workOrders).save(saved.capture());
+        WorkOrder created = saved.getValue();
+        assertThat(created.getType()).isEqualTo(WorkOrderType.INSPECTION);
+        assertThat(created.getPriority()).isEqualTo(WorkOrderPriority.HIGH);
+        assertThat(created.getTitle()).isEqualTo("Predicted temperature failure");
+        assertThat(created.getDescription()).contains("87% probability", "rf-24h-test",
+                "trend reaches the critical limit in about 25 min");
+        assertThat(created.getRequestedBy()).isEqualTo("ai-insights");
+        assertThat(created.getAlertIds()).isEmpty();
+        assertThat(published).singleElement().isInstanceOfSatisfying(WorkOrderEventMessage.class,
+                event -> assertThat(event.eventType()).isEqualTo(ActivityType.CREATED));
+    }
+
+    @Test
+    void noInspectionWhenTheMachineAlreadyHasAnOpenWorkOrder() {
+        UUID assetId = UUID.randomUUID();
+        when(workOrders.existsByAssetIdAndStatusIn(eq(assetId), any())).thenReturn(true);
+
+        service.planInspectionForRisk(highRisk(assetId));
+
+        verify(workOrders, never()).save(any());
+        assertThat(published).isEmpty();
+    }
+
+    private RiskLevelChangedMessage highRisk(UUID assetId) {
+        return new RiskLevelChangedMessage(assetId, "MEDIUM", "HIGH", 0.87, "TEMPERATURE", 0.42,
+                List.of("trend reaches the critical limit in about 25 min"), "rf-24h-test", clock.instant());
     }
 }

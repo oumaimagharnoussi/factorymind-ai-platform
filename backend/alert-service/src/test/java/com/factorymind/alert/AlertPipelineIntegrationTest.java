@@ -28,7 +28,6 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -66,9 +65,6 @@ class AlertPipelineIntegrationTest {
 
     @Autowired
     MockMvc mvc;
-
-    @Value("${spring.kafka.bootstrap-servers}")
-    String bootstrapServers;
 
     /** Owned by telemetry-service and maintenance-service in real life; this test plays both. */
     @TestConfiguration
@@ -151,7 +147,7 @@ class AlertPipelineIntegrationTest {
 
     private void send(String topic, String key, String json) {
         try (var producer = new KafkaProducer<String, String>(Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers(),
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
                 ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class))) {
             producer.send(new ProducerRecord<>(topic, key, json)).get();
@@ -163,7 +159,7 @@ class AlertPipelineIntegrationTest {
     private List<String> alertEventTypes(UUID assetId) {
         List<String> types = new ArrayList<>();
         try (var consumer = new KafkaConsumer<String, String>(Map.of(
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers(),
                 ConsumerConfig.GROUP_ID_CONFIG, "test-" + UUID.randomUUID(),
                 ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
                 ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,

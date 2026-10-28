@@ -46,6 +46,11 @@ spring:
               uri: ${INVENTORY_SERVICE_URL:http://localhost:8086}
               predicates:
                 - Path=/api/inventory/**
+            # The Python model service is not routed: only ai-insights-service talks to it.
+            - id: ai-insights-service
+              uri: ${AI_INSIGHTS_SERVICE_URL:http://localhost:8087}
+              predicates:
+                - Path=/api/insights/**
 
 management:
   endpoints:

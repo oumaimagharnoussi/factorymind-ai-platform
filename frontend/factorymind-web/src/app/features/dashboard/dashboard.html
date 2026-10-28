@@ -64,6 +64,19 @@
       </span>
       <span class="kpi-hint">{{ maintenanceSummary.value()?.completedLast30Days ?? 0 }} orders completed</span>
     </mat-card>
+    <a class="kpi-link" routerLink="/ai-insights">
+      <mat-card class="kpi" [class.bad]="highRisk().length > 0">
+        <span class="kpi-label">High failure risk</span>
+        <span class="kpi-value">{{ highRisk().length }}</span>
+        <span class="kpi-hint">
+          @if (highRisk()[0]; as top) {
+            {{ assets.code(top.assetId) }} at {{ top.riskScore * 100 | number: '1.0-0' }}% · AI model, next 24 h
+          } @else {
+            machines · AI model, next 24 h
+          }
+        </span>
+      </mat-card>
+    </a>
     <a class="kpi-link" routerLink="/inventory" [queryParams]="{ lowStock: true }">
       <mat-card class="kpi" [class.warn]="(inventorySummary.value()?.lowStock ?? 0) > 0">
         <span class="kpi-label">Parts to reorder</span>
