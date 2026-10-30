@@ -1,4 +1,4 @@
-import { renderMarkdown } from './markdown';
+import { renderCitations, renderMarkdown } from './markdown';
 
 describe('renderMarkdown', () => {
   it('renders a report: heading, bold, numbered actions', () => {
@@ -21,6 +21,12 @@ describe('renderMarkdown', () => {
   it('switches between bullet and numbered lists', () => {
     expect(renderMarkdown('- a\n- b\n1. c')).toBe(
       '<ul><li>a</li><li>b</li></ul><ol><li>c</li></ol>',
+    );
+  });
+
+  it('marks the copilot citations', () => {
+    expect(renderCitations(renderMarkdown('Lock out first [2].'))).toBe(
+      '<p>Lock out first <sup class="cite" title="Show source 2">2</sup>.</p>',
     );
   });
 });

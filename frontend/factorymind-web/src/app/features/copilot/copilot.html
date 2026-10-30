@@ -1,0 +1,181 @@
+<header class="page-header">
+  <div>
+    <h1>Maintenance copilot</h1>
+    <p class="subtitle">
+      Ask how to diagnose, repair or work safely on a machine. The copilot searches the plant's manuals and
+      procedures, reads the live risks, alerts and work orders, and cites every passage it uses so you can check it.
+    </p>
+  </div>
+</header>
+
+@if (status.value(); as s) {
+  <section class="engine">
+    <span class="pill" [class.off]="!s.chatModel">
+      <mat-icon inline>smart_toy</mat-icon>
+      @if (s.chatModel) {
+        {{ s.chatModel }}
+      } @else {
+        No language model: the copilot finds passages but writes no answer (set AI_CHAT_PROVIDER)
+      }
+    </span>
+    <span
+      class="pill"
+      [matTooltip]="
+        s.knowledge.retrieval === 'HYBRID'
+          ? 'Postgres full-text search for exact terms, pgvector for the same meaning in other words, merged by rank'
+          : 'Postgres full-text search; set AI_EMBEDDING_PROVIDER=ollama to also search by meaning'
+      "
+    >
+      <mat-icon inline>travel_explore</mat-icon>
+      @if (s.knowledge.retrieval === 'HYBRID') {
+        Hybrid search · {{ s.knowledge.embeddingModel }} ({{ s.knowledge.embeddedChunks }}/{{ s.knowledge.chunks }} passages embedded)
+      } @else {
+        Keyword search
+      }
+    </span>
+    <span class="pill">
+      <mat-icon inline>menu_book</mat-icon>
+      {{ s.knowledge.documents }} documents · {{ s.knowledge.chunks }} passages
+    </span>
+  </section>
+}
+
+<mat-tab-group [selectedIndex]="tab()" (selectedIndexChange)="tab.set($event)" animationDuration="0ms">
+  <mat-tab label="Ask">
+    <mat-card class="chat">
+      <mat-card-content>
+        <div class="toolbar">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="machine">
+            <mat-label>Machine</mat-label>
+            <mat-select [value]="assetId()" (valueChange)="assetId.set($event)">
+              <mat-option [value]="null">Any machine (or name it: "M-102")</mat-option>
+              @for (machine of assets.list(); track machine.id) {
+                <mat-option [value]="machine.id">
+                  {{ machine.assetCode }} {{ machine.name }}
+                  @if (machine.model) {
+                    <span class="secondary">· {{ machine.manufacturer }} {{ machine.model }}</span>
+                  }
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          @if (exchanges().length) {
+            <button mat-button (click)="newConversation()"><mat-icon>add_comment</mat-icon> New conversation</button>
+          }
+        </div>
+
+        <div class="conversation" #conversation>
+          @for (exchange of exchanges(); track $index; let i = $index) {
+            <div class="exchange">
+              <p class="question"><mat-icon inline>person</mat-icon> {{ exchange.question }}</p>
+              @if (exchange.answer; as answer) {
+                <div class="answer" [class.passages-only]="answer.mode === 'PASSAGES_ONLY'">
+                  <div class="markdown" [innerHTML]="answerHtml(answer)" (click)="onAnswerClick($event, i)"></div>
+                  <p class="secondary meta">
+                    {{ generatedByLabel(answer) }}
+                    @if (answer.machine) {
+                      · about {{ answer.machine }}
+                    }
+                    · {{ answer.retrieval === 'HYBRID' ? 'hybrid search' : 'keyword search' }}
+                    · {{ answer.answeredAt | date: 'mediumTime' }}
+                  </p>
+
+                  @if (cited(answer).length) {
+                    <div class="sources">
+                      @for (source of cited(answer); track source.number) {
+                        <ng-container
+                          [ngTemplateOutlet]="sourceCard"
+                          [ngTemplateOutletContext]="{ $implicit: source, index: i }"
+                        />
+                      }
+                    </div>
+                  }
+                  @if (alsoRead(answer).length) {
+                    <details class="also-read" [open]="highlighted()?.startsWith(i + ':')">
+                      <summary>{{ alsoRead(answer).length }} more passages read but not cited</summary>
+                      <div class="sources">
+                        @for (source of alsoRead(answer); track source.number) {
+                          <ng-container
+                            [ngTemplateOutlet]="sourceCard"
+                            [ngTemplateOutletContext]="{ $implicit: source, index: i }"
+                          />
+                        }
+                      </div>
+                    </details>
+                  }
+                </div>
+              }
+              @if (exchange.error; as message) {
+                <p class="error">{{ message }}</p>
+              }
+            </div>
+          } @empty {
+            <div class="welcome">
+              <mat-icon>menu_book</mat-icon>
+              <p>Pick a machine to search its manuals and the plant procedures, or ask about any machine.</p>
+              <mat-chip-set aria-label="Suggested questions">
+                @for (suggestion of suggestions(); track suggestion) {
+                  <mat-chip (click)="ask(suggestion)" [disabled]="asking()">{{ suggestion }}</mat-chip>
+                }
+              </mat-chip-set>
+            </div>
+          }
+        </div>
+
+        @if (asking()) {
+          <mat-progress-bar mode="indeterminate" />
+        }
+        <form class="ask" (ngSubmit)="ask()">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Your question</mat-label>
+            <input matInput name="question" maxlength="1000" autocomplete="off" [(ngModel)]="question" [disabled]="asking()" />
+          </mat-form-field>
+          <button mat-flat-button type="submit" [disabled]="asking() || !question.trim()">
+            <mat-icon>send</mat-icon> Ask
+          </button>
+        </form>
+        <p class="secondary disclaimer">
+          The copilot reads data but changes nothing. Check its answer against the cited passages, and follow your
+          site's safety rules.
+        </p>
+      </mat-card-content>
+    </mat-card>
+  </mat-tab>
+
+  <mat-tab label="Knowledge base">
+    <app-knowledge-base
+      [status]="status.value() ?? null"
+      [(selected)]="openDocument"
+      (changed)="status.reload()"
+    />
+  </mat-tab>
+</mat-tab-group>
+
+<ng-template #sourceCard let-source let-index="index">
+  <article
+    class="source"
+    [id]="'source-' + index + '-' + source.number"
+    [class.highlighted]="highlighted() === index + ':' + source.number"
+  >
+    <header>
+      <span class="number">{{ source.number }}</span>
+      <span class="where">
+        <strong>{{ source.documentTitle }}</strong>
+        @if (location(source); as where) {
+          <span class="secondary">› {{ where }}</span>
+        }
+      </span>
+      <span class="secondary found">{{ foundBy(source) }}</span>
+      <button
+        mat-icon-button
+        type="button"
+        matTooltip="Open the document"
+        aria-label="Open the document"
+        (click)="openInKnowledgeBase(source.documentId)"
+      >
+        <mat-icon>open_in_new</mat-icon>
+      </button>
+    </header>
+    <div class="markdown excerpt" [innerHTML]="excerptHtml(source)"></div>
+  </article>
+</ng-template>

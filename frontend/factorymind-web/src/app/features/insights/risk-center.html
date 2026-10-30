@@ -110,15 +110,20 @@
           </tbody>
         </table>
 
-        @if (canUseLanguageModel()) {
-          <div class="report-actions">
+        <div class="report-actions">
+          @if (canUseLanguageModel()) {
             <button mat-flat-button (click)="writeReport(risk.assetId)" [disabled]="writingReport()">
               <mat-icon>description</mat-icon> Write maintenance report
             </button>
-            @if (writingReport()) {
-              <span class="secondary">Writing…</span>
-            }
-          </div>
+          }
+          <a mat-stroked-button routerLink="/copilot" [queryParams]="{ asset: risk.assetId }">
+            <mat-icon>smart_toy</mat-icon> Ask the copilot
+          </a>
+          @if (writingReport()) {
+            <span class="secondary">Writing…</span>
+          }
+        </div>
+        @if (canUseLanguageModel()) {
           @if (reportError(); as message) {
             <p class="error">{{ message }}</p>
           }
@@ -136,54 +141,6 @@
     </mat-card>
   }
 </div>
-
-@if (canUseLanguageModel()) {
-  <mat-card class="assistant">
-    <mat-card-header>
-      <mat-icon mat-card-avatar>smart_toy</mat-icon>
-      <mat-card-title>Ask FactoryMind</mat-card-title>
-      <mat-card-subtitle>
-        @if (assistant.value(); as status) {
-          @if (status.enabled) {
-            {{ status.model }} · looks up live risks, alerts and work orders before it answers; it cannot change anything
-          } @else {
-            Off: no language model is configured (set AI_CHAT_PROVIDER to anthropic or ollama)
-          }
-        }
-      </mat-card-subtitle>
-    </mat-card-header>
-    @if (assistant.value()?.enabled) {
-      <mat-card-content>
-        <mat-chip-set aria-label="Suggested questions">
-          @for (suggestion of suggestions; track suggestion) {
-            <mat-chip (click)="ask(suggestion)" [disabled]="asking()">{{ suggestion }}</mat-chip>
-          }
-        </mat-chip-set>
-        <form class="ask" (ngSubmit)="ask()">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Your question</mat-label>
-            <input matInput name="question" maxlength="500" [(ngModel)]="question" [disabled]="asking()" />
-          </mat-form-field>
-          <button mat-flat-button type="submit" [disabled]="asking() || !question.trim()">Ask</button>
-        </form>
-        @if (asking()) {
-          <mat-progress-bar mode="indeterminate" />
-        }
-        @for (exchange of exchanges(); track $index) {
-          <div class="exchange">
-            <p class="question"><mat-icon inline>person</mat-icon> {{ exchange.question }}</p>
-            @if (exchange.answer; as answer) {
-              <div class="markdown" [innerHTML]="answerHtml(answer)"></div>
-            }
-            @if (exchange.error; as message) {
-              <p class="error">{{ message }}</p>
-            }
-          </div>
-        }
-      </mat-card-content>
-    }
-  </mat-card>
-}
 
 @if (modelCard.value(); as card) {
   <mat-card class="model-card">

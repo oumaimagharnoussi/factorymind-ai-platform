@@ -132,28 +132,8 @@
   background: var(--fm-muted-bg);
 }
 
-.assistant,
 .model-card {
   margin-bottom: 16px;
-}
-
-.ask {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin: 12px 0;
-
-  mat-form-field { flex: 1; }
-}
-
-.exchange {
-  padding: 10px 0;
-  border-top: 1px solid var(--fm-border);
-
-  .question {
-    margin: 0 0 6px;
-    font-weight: 500;
-  }
 }
 
 .model-grid {

@@ -57,8 +57,14 @@ public class AssetDirectory {
         }
     }
 
+    /** @param model the manufacturer's model ("HP-400"): the copilot looks for manuals of that model */
     public record Machine(UUID id, String assetCode, String name, String lineName, String factoryName,
-                          String criticality) {
+                          String criticality, String manufacturer, String model) {
+
+        public Machine(UUID id, String assetCode, String name, String lineName, String factoryName,
+                       String criticality) {
+            this(id, assetCode, name, lineName, factoryName, criticality, null, null);
+        }
 
         public String label() {
             return assetCode + " " + name;

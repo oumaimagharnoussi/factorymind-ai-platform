@@ -447,13 +447,83 @@ export interface MachineReport {
   generatedAt: string;
 }
 
-export interface AssistantStatus {
-  enabled: boolean;
-  model: string;
+/** What the copilot runs on: a language model writes answers; without one it returns passages only. */
+export interface CopilotStatus {
+  /** "anthropic:claude-sonnet-5-5", or null when no language model is configured. */
+  chatModel: string | null;
+  knowledge: KnowledgeStatus;
 }
 
-export interface AssistantAnswer {
+export type Retrieval = 'HYBRID' | 'KEYWORD';
+
+export interface KnowledgeStatus {
+  /** HYBRID: keywords and embeddings; KEYWORD: Postgres full-text search only. */
+  retrieval: Retrieval;
+  embeddingModel: string | null;
+  documents: number;
+  chunks: number;
+  embeddedChunks: number;
+}
+
+export interface CopilotTurn {
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+}
+
+export interface CopilotSource {
+  number: number;
+  documentId: string;
+  documentTitle: string;
+  kind: DocumentKind;
+  section: string | null;
+  page: number | null;
+  excerpt: string;
+  /** Whether the answer refers to it as [number]. */
+  cited: boolean;
+  keywordRank: number | null;
+  vectorRank: number | null;
+}
+
+export interface CopilotAnswer {
+  /** Markdown with citations like [2]. */
   answer: string;
+  mode: 'GENERATED' | 'PASSAGES_ONLY';
+  /** "anthropic:claude-sonnet-5-5", or "search" when no language model wrote it. */
   generatedBy: string;
+  assetId: string | null;
+  machine: string | null;
+  retrieval: Retrieval;
+  sources: CopilotSource[];
+  /** Why the language model's answer is missing, when it failed. */
+  notice: string | null;
   answeredAt: string;
+}
+
+export type DocumentKind = 'MANUAL' | 'PROCEDURE';
+
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  kind: DocumentKind;
+  origin: 'BUILT_IN' | 'UPLOADED';
+  fileName: string;
+  /** Lower-case machine models; empty = every machine. */
+  machineModels: string[];
+  chunks: number;
+  embeddedChunks: number;
+  uploadedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgeChunk {
+  index: number;
+  section: string | null;
+  page: number | null;
+  content: string;
+}
+
+export interface KnowledgeDocumentDetail {
+  document: KnowledgeDocument;
+  chunks: KnowledgeChunk[];
 }

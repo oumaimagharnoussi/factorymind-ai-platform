@@ -1,0 +1,115 @@
+<div class="layout">
+  <mat-card class="documents">
+    <mat-card-header>
+      <mat-card-title>Manuals and procedures</mat-card-title>
+      <mat-card-subtitle>
+        A manual is searched only for its machine models; a procedure applies to every machine.
+      </mat-card-subtitle>
+    </mat-card-header>
+    @if (documents.isLoading() && !documents.value()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    <mat-card-content>
+      @for (document of documents.value() ?? []; track document.id) {
+        <div class="document" [class.selected]="document.id === selected()">
+          <button type="button" class="open" (click)="selected.set(document.id)">
+            <span class="title">
+              <strong>{{ document.title }}</strong>
+              <span class="secondary">
+                {{ machinesLabel(document) }} · {{ document.chunks }} passages
+                @if (embedding(document); as embedded) {
+                  · {{ embedded }}
+                }
+                ·
+                @if (document.origin === 'BUILT_IN') {
+                  built in
+                } @else {
+                  added by {{ document.uploadedBy ?? 'unknown' }} {{ document.createdAt | date: 'mediumDate' }}
+                }
+              </span>
+            </span>
+            <app-status-chip [value]="document.kind" />
+          </button>
+          @if (canEdit() && document.origin === 'UPLOADED') {
+            <button mat-icon-button matTooltip="Remove" aria-label="Remove" (click)="remove(document)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          }
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+
+  <div class="side">
+    @if (canEdit()) {
+      <mat-card class="upload">
+        <mat-card-header>
+          <mat-card-title>Add a document</mat-card-title>
+          <mat-card-subtitle>Markdown, text, or a PDF with selectable text · 10 MB max</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <form class="form" (ngSubmit)="upload(fileInput)">
+            <div class="file">
+              <input #fileInput type="file" accept=".md,.markdown,.txt,.pdf" (change)="pick($event)" hidden />
+              <button mat-stroked-button type="button" (click)="fileInput.click()">
+                <mat-icon>upload_file</mat-icon> Choose a file
+              </button>
+              <span class="secondary">{{ file?.name ?? 'No file chosen' }}</span>
+            </div>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Title (optional)</mat-label>
+              <input matInput name="title" maxlength="200" [(ngModel)]="title" placeholder="From the file if empty" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Kind</mat-label>
+              <mat-select name="kind" [(ngModel)]="kind">
+                @for (k of kinds; track k) {
+                  <mat-option [value]="k">{{ k === 'MANUAL' ? 'Machine manual' : 'Plant procedure' }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Machine models</mat-label>
+              <mat-select name="machines" multiple [(ngModel)]="machines" placeholder="Every machine">
+                @for (m of models(); track m.model) {
+                  <mat-option [value]="m.model">{{ m.model }} <span class="secondary">({{ m.codes }})</span></mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-flat-button type="submit" [disabled]="!file || uploading()">Add to the knowledge base</button>
+            @if (uploading()) {
+              <mat-progress-bar mode="indeterminate" />
+            }
+            @if (message(); as m) {
+              <p [class.error]="m.error" [class.ok]="!m.error">{{ m.text }}</p>
+            }
+          </form>
+        </mat-card-content>
+      </mat-card>
+    }
+
+    @if (detail.value(); as d) {
+      <mat-card class="detail">
+        <mat-card-header>
+          <mat-card-title>{{ d.document.title }}</mat-card-title>
+          <mat-card-subtitle>{{ d.document.fileName }} · {{ d.chunks.length }} passages, as the copilot reads them</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          @for (chunk of d.chunks; track chunk.index) {
+            <section class="chunk">
+              <p class="secondary">
+                #{{ chunk.index + 1 }}
+                @if (chunk.section) {
+                  · {{ chunk.section }}
+                }
+              </p>
+              <div class="markdown" [innerHTML]="chunkHtml(chunk.content)"></div>
+            </section>
+          }
+        </mat-card-content>
+      </mat-card>
+    } @else if (!canEdit()) {
+      <p class="secondary hint">Select a document to read it the way the copilot does.</p>
+    }
+  </div>
+</div>

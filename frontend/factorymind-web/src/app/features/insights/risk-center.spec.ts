@@ -38,8 +38,6 @@ function risk(
 }
 
 describe('RiskCenter', () => {
-  const ask = vi.fn();
-
   function render() {
     TestBed.configureTestingModule({
       providers: [
@@ -59,8 +57,6 @@ describe('RiskCenter', () => {
               ]),
             history: () => of([]),
             modelCard: () => of(null),
-            assistant: () => of({ enabled: true, model: 'anthropic:claude-sonnet-5-5' }),
-            ask,
           },
         },
       ],
@@ -81,21 +77,12 @@ describe('RiskCenter', () => {
     expect(page.querySelector('.detail')?.textContent).toContain('about 24 min');
   });
 
-  it('puts the latest question on top with its answer', () => {
-    ask.mockReturnValue(
-      of({
-        answer: '**M-102** first.',
-        generatedBy: 'anthropic:claude-sonnet-5-5',
-        answeredAt: '2026-10-28T10:00:00Z',
-      }),
+  it('sends questions about the selected machine to the copilot', () => {
+    const page: HTMLElement = render().nativeElement;
+
+    const link = [...page.querySelectorAll('.report-actions a')].find((a) =>
+      a.textContent?.includes('Ask the copilot'),
     );
-    const fixture = render();
-
-    fixture.componentInstance['ask']('Which machine first?');
-    fixture.detectChanges();
-
-    const exchange: HTMLElement = fixture.nativeElement.querySelector('.exchange');
-    expect(exchange.textContent).toContain('Which machine first?');
-    expect(exchange.querySelector('strong')?.textContent).toBe('M-102');
+    expect(link?.getAttribute('href')).toBe('/copilot?asset=m-102');
   });
 });

@@ -50,6 +50,14 @@ export function renderMarkdown(markdown: string): string {
   return html.join('');
 }
 
+/**
+ * Turns the copilot's source references, "[2]", into superscript markers the page can make clickable
+ * (it reads the number from the marker's text). Apply to the output of renderMarkdown.
+ */
+export function renderCitations(html: string): string {
+  return html.replace(/\[(\d{1,2})\]/g, '<sup class="cite" title="Show source $1">$1</sup>');
+}
+
 function escape(text: string): string {
   return text
     .replaceAll('&', '&amp;')

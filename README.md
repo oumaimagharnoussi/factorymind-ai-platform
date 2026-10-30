@@ -34,9 +34,10 @@ a Python ML service and Power BI analytics.
 | Inventory service: spare parts, stock movements ledger, receipts, stock counts, low-stock view | ✅ |
 | Failure-risk model (Python, scikit-learn, FastAPI) trained on simulated run-to-failure data, with a model card | ✅ |
 | AI insights service: live risk per machine from Kafka telemetry, inspection work order when a machine turns HIGH | ✅ |
-| Spring AI: maintenance report per machine and an assistant that answers with tool calls on live data (Claude or Ollama) | ✅ |
+| Spring AI: maintenance report per machine (Claude or Ollama) | ✅ |
+| Maintenance copilot: RAG on machine manuals and procedures (hybrid search Postgres full-text + pgvector), cited sources, live plant data through tool calls, document upload (Markdown, text, PDF) | ✅ |
 | Preventive maintenance plans | Later |
-| Maintenance copilot on machine manuals (Spring AI + RAG), Power BI reports | Weeks 12–13 |
+| Power BI reports | Weeks 12–13 |
 | Observability (Prometheus, Grafana) | Weeks 14–15 |
 
 ## Architecture
@@ -52,10 +53,10 @@ API Gateway (8080) ─┬─► asset-service (8081) ──────► Postg
                     ├─► maintenance-service (8084) ► PostgreSQL maintenance_db
                     │        │ REST: issue / return parts (token relayed)
                     ├─► inventory-service (8086) ──► PostgreSQL inventory_db
-                    └─► ai-insights-service (8087) ► PostgreSQL insights_db
+                    └─► ai-insights-service (8087) ► PostgreSQL insights_db (+ pgvector: manuals)
                              │ REST /predict           │ Spring AI (optional)
                              ▼                         ▼
-                     ml-service (8090, Python)   Claude API or Ollama
+                     ml-service (8090, Python)   Claude API or Ollama (chat), Ollama (embeddings)
 
 Kafka (9092)
   asset.sensor-definitions   asset ──► telemetry
@@ -78,6 +79,10 @@ Every 10 s, ai-insights-service sends each machine's latest readings to the Pyth
 probability that a sensor reaches its critical limit within 24 h and the reasons; a machine that turns HIGH gets
 an inspection work order, usually minutes before the first alert in the demo. See
 [ADR 0005](docs/adr/0005-ai-insights-ml.md).
+The maintenance copilot answers "how do I fix / check / work safely on this machine" from the manuals and
+procedures: it finds the best passages with Postgres full-text search and pgvector embeddings merged by rank,
+gives them to the language model with the live risks, alerts and work orders as tools, and the answer cites
+each passage as [n]. See [ADR 0006](docs/adr/0006-maintenance-copilot-rag.md).
 Decisions are recorded in [`docs/adr`](docs/adr).
 
 ## Security
@@ -99,6 +104,7 @@ Every role can watch live and historical readings; pushing readings over HTTP ne
 | Alerts | Read, acknowledge | + resolve | Same as engineer |
 | Work orders | Read, create | + edit, change status, book parts | Same as engineer |
 | Spare parts | Read | + create / edit parts, receive deliveries | + stock counts, delete parts |
+| AI | Read risks, ask the copilot | + machine reports, add / remove copilot documents | Same as engineer |
 
 Demo accounts (realm import in `infrastructure/keycloak/factorymind-realm.json`; change them before any real use):
 
@@ -114,7 +120,8 @@ Keycloak admin console: http://localhost:8180/auth/admin (`KEYCLOAK_ADMIN` / `KE
 ## Tech stack
 
 Java 25 · Spring Boot 4.0.9 · Spring Cloud 2025.1.4 (Gateway) · Spring for Apache Kafka · Apache Kafka 4.3 (KRaft) ·
-Spring Data JPA · Flyway · PostgreSQL 17 · Server-Sent Events · Spring AI 2.0.1 (Anthropic Claude, Ollama, tool calling) ·
+Spring Data JPA · Flyway · PostgreSQL 17 + pgvector · Server-Sent Events ·
+Spring AI 2.0.1 (Anthropic Claude, Ollama, tool calling, embeddings, PDF reader) · RAG with hybrid search ·
 Python 3.13 · scikit-learn 1.9 · FastAPI · pytest ·
 Angular 22 (standalone components, signals, `rxResource`, reactive forms, Angular Material) · Vitest ·
 JUnit 5 · Mockito · Testcontainers · Docker Compose · GitHub Actions.
@@ -137,10 +144,13 @@ turn critical, **Alerts** shows the alarms and **Work orders** gets an urgent or
 **AI risk center** flags them earlier: their risk turns HIGH while the readings are still below the warning
 limit, and an inspection work order appears before the alert.
 
-Reports and the assistant use a language model only if you choose one in `.env`:
+Reports and the copilot use a language model only if you choose one in `.env`:
 `AI_CHAT_PROVIDER=anthropic` with `ANTHROPIC_API_KEY`, or `AI_CHAT_PROVIDER=ollama` with
 `docker compose --profile ollama up -d` and `docker compose exec ollama ollama pull llama3.2` (free, local).
-Without one, reports are rule-based and the assistant is off; risk scoring never needs a language model.
+Without one, reports are rule-based and the **Maintenance copilot** returns the best manual passages instead of
+writing an answer; risk scoring never needs a language model. To let the copilot also search by meaning, set
+`AI_EMBEDDING_PROVIDER=ollama` and pull the embedding model once:
+`docker compose exec ollama ollama pull nomic-embed-text` (this works with Claude as the chat model too).
 
 | URL | What |
 |---|---|
@@ -155,6 +165,9 @@ Without one, reports are rule-based and the assistant is off; risk scoring never
 
 Already ran an earlier phase? `docker compose up --build` is enough: the `db-init` container creates
 the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`, `insights_db`) in the existing Postgres volume.
+Coming from before phase 6, recreate the Postgres volume once (`docker compose down -v`): Postgres now runs on the
+Debian-based `pgvector/pgvector` image, whose text sorting differs from the old Alpine one. The demo data comes back
+on start.
 
 ### For development
 
@@ -277,9 +290,12 @@ Errors use RFC 9457 problem details, for example:
 | GET | `/api/insights/risks` | Latest failure risk of every machine, highest first, with per-sensor reasons |
 | GET | `/api/insights/risks/{assetId}`, `/history?minutes=` | One machine, and its risk over time |
 | GET | `/api/insights/model` | Model card: training data, feature importances, metrics against the warning rule |
-| GET | `/api/insights/assistant` | Whether a language model is configured, and which |
 | POST | `/api/insights/assets/{assetId}/report` | Maintenance report (language model, or rule-based), ENGINEER/ADMIN |
-| POST | `/api/insights/ask` | `{"question"}`: answer from live data via tool calls, ENGINEER/ADMIN |
+| GET | `/api/insights/copilot` | Language model, embedding model, retrieval mode, documents and passages |
+| POST | `/api/insights/copilot/ask` | `{"question", "assetId"?, "history"?}`: answer citing manual passages as [n], with the passages |
+| GET | `/api/insights/knowledge/documents`, `/{id}` | Manuals and procedures; one document cut into passages |
+| POST | `/api/insights/knowledge/documents` | Multipart `file` (.md, .txt, .pdf, 10 MB) + `title`, `kind`, `machines`, ENGINEER/ADMIN |
+| DELETE | `/api/insights/knowledge/documents/{id}` | Remove an uploaded document (built-in ones: 409), ENGINEER/ADMIN |
 
 ## Repository layout
 

@@ -35,11 +35,17 @@ spring:
       ddl-auto: validate
     properties:
       hibernate.jdbc.time_zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
   ai:
     model:
-      # anthropic (needs ANTHROPIC_API_KEY), ollama (local, free) or none (rule-based reports, no assistant).
+      # anthropic (needs ANTHROPIC_API_KEY), ollama (local, free) or none (rule-based reports, copilot finds passages only).
       chat: ${AI_CHAT_PROVIDER:none}
-      embedding: none
+      # ollama (nomic-embed-text: the copilot also searches by meaning) or none (keyword search only).
+      # Anthropic has no embedding model: with Claude for chat, embeddings still come from Ollama.
+      embedding: ${AI_EMBEDDING_PROVIDER:none}
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
       chat:
@@ -49,6 +55,9 @@ spring:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
         model: ${OLLAMA_MODEL:llama3.2}
+      embedding:
+        # 768 dimensions, the width of knowledge_chunks.embedding.
+        model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
 
 insights:
   # The Python model service (ml/predictive-maintenance).
@@ -61,6 +70,12 @@ insights:
   scoring-interval: ${INSIGHTS_SCORING_INTERVAL:PT10S}
   # How long the risk history is kept.
   retention: ${INSIGHTS_RETENTION:P3D}
+  knowledge:
+    # Characters per passage: long enough to hold a procedure step with its context, short enough to be precise.
+    chunk-size: 1000
+    # nomic-embed-text expects these task prefixes; clear them for another embedding model.
+    query-prefix: "${KNOWLEDGE_QUERY_PREFIX:search_query: }"
+    document-prefix: "${KNOWLEDGE_DOCUMENT_PREFIX:search_document: }"
 
 management:
   endpoints:

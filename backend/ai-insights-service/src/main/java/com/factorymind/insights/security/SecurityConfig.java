@@ -1,5 +1,6 @@
 package com.factorymind.insights.security;
 
+import static org.springframework.http.HttpMethod.DELETE;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 
@@ -12,8 +13,9 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Everyone signed in reads the risks. Reports and the assistant call a paid language model, so they are kept
- * for ENGINEER and ADMIN, the people who plan maintenance.
+ * Everyone signed in reads the risks and asks the copilot: operators at the machine are the first readers of
+ * procedures. Reports are kept for ENGINEER and ADMIN, the people who plan maintenance, and so is the
+ * knowledge base: what the copilot answers from is their responsibility.
  */
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfig {
@@ -37,7 +39,9 @@ public class SecurityConfig {
 
                         .requestMatchers(GET, "/api/insights/**").hasAnyRole(ADMIN, ENGINEER, OPERATOR)
                         .requestMatchers(POST, "/api/insights/assets/*/report").hasAnyRole(ADMIN, ENGINEER)
-                        .requestMatchers(POST, "/api/insights/ask").hasAnyRole(ADMIN, ENGINEER)
+                        .requestMatchers(POST, "/api/insights/copilot/ask").hasAnyRole(ADMIN, ENGINEER, OPERATOR)
+                        .requestMatchers(POST, "/api/insights/knowledge/documents").hasAnyRole(ADMIN, ENGINEER)
+                        .requestMatchers(DELETE, "/api/insights/knowledge/documents/*").hasAnyRole(ADMIN, ENGINEER)
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)))
                 .build();

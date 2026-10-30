@@ -30,7 +30,7 @@ public class PlantTools {
     private final MachineContext context;
     private final Instant now;
 
-    PlantTools(Map<UUID, AssetDirectory.Machine> machines, LatestRisks risks, AlertSnapshotRepository alerts,
+    public PlantTools(Map<UUID, AssetDirectory.Machine> machines, LatestRisks risks, AlertSnapshotRepository alerts,
                WorkOrderSnapshotRepository workOrders, MachineContext context, Instant now) {
         this.machines = machines;
         this.risks = risks;

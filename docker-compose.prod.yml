@@ -4,7 +4,8 @@ name: factorymind
 
 services:
   postgres:
-    image: postgres:17-alpine
+    # Postgres 17 with the pgvector extension (embeddings of the copilot's knowledge base).
+    image: pgvector/pgvector:0.8.1-pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -178,7 +179,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       ML_SERVICE_URL: http://ml-service:8090
       ASSET_SERVICE_URL: http://asset-service:8081
-      # The public demo writes rule-based reports unless a key is set in .env.
+      # The public demo writes rule-based reports unless a key is set in .env. Without Ollama the copilot
+      # searches the manuals by keywords only (Postgres full-text search).
       AI_CHAT_PROVIDER: ${AI_CHAT_PROVIDER:-none}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}

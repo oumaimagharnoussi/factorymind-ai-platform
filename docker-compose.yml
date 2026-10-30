@@ -2,7 +2,8 @@ name: factorymind
 
 services:
   postgres:
-    image: postgres:17-alpine
+    # Postgres 17 with the pgvector extension (embeddings of the copilot's knowledge base).
+    image: pgvector/pgvector:0.8.1-pg17
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-factorymind}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
@@ -221,6 +222,8 @@ services:
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      AI_EMBEDDING_PROVIDER: ${AI_EMBEDDING_PROVIDER:-none}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
       KEYCLOAK_ISSUER_URI: http://localhost:8180/auth/realms/factorymind
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
     ports:
@@ -235,8 +238,9 @@ services:
       ml-service:
         condition: service_healthy
 
-  # Optional free local language model: docker compose --profile ollama up -d,
-  # then once: docker compose exec ollama ollama pull llama3.2 (about 2 GB), and set AI_CHAT_PROVIDER=ollama.
+  # Optional free local models: docker compose --profile ollama up -d, then once:
+  #   docker compose exec ollama ollama pull llama3.2           (chat, about 2 GB)    -> AI_CHAT_PROVIDER=ollama
+  #   docker compose exec ollama ollama pull nomic-embed-text   (embeddings, 270 MB)  -> AI_EMBEDDING_PROVIDER=ollama
   ollama:
     image: ollama/ollama:0.40.3
     profiles: ["ollama"]

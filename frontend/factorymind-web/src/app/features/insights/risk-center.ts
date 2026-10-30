@@ -1,20 +1,16 @@
 import { DatePipe, DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { rxResource, takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
-import { interval, of } from 'rxjs';
+import { interval } from 'rxjs';
 import { AssetDirectory } from '../../core/api/asset-directory';
 import { InsightsApi } from '../../core/api/insights-api';
-import { AssistantAnswer, MachineReport, MachineRisk, RiskLevel } from '../../core/api/models';
+import { MachineReport, MachineRisk, RiskLevel } from '../../core/api/models';
 import { Auth } from '../../core/auth/auth';
 import { describeError } from '../../core/http/problem';
 import { humanize, sensorLabel } from '../../shared/labels';
@@ -25,15 +21,10 @@ import { StatusChip } from '../../shared/status-chip';
 /** ai-insights-service scores every machine this often; the page follows. */
 const REFRESH_MS = 10_000;
 
-interface Exchange {
-  question: string;
-  answer?: AssistantAnswer;
-  error?: string;
-}
-
 /**
  * Failure risk of every machine, from the scikit-learn model fed with live telemetry, with the reasons
- * behind each score, a report per machine and an assistant that answers from live plant data.
+ * behind each score and a report per machine. Questions go to the maintenance copilot, which also reads the
+ * manuals.
  */
 @Component({
   selector: 'app-risk-center',
@@ -41,14 +32,10 @@ interface Exchange {
     DatePipe,
     DecimalPipe,
     PercentPipe,
-    FormsModule,
     RouterLink,
     MatButtonModule,
     MatCardModule,
-    MatChipsModule,
-    MatFormFieldModule,
     MatIconModule,
-    MatInputModule,
     MatProgressBarModule,
     MatTooltipModule,
     Sparkline,
@@ -67,18 +54,9 @@ export class RiskCenter {
   protected readonly canUseLanguageModel = computed(() =>
     this.auth.hasAnyRole('ADMIN', 'ENGINEER'),
   );
-  protected readonly suggestions = [
-    'Which machine needs attention first?',
-    'Why is the riskiest machine at risk, and is someone already on it?',
-    'Which unresolved alerts have no work order yet?',
-  ];
 
   protected readonly risks = rxResource({ stream: () => this.api.risks() });
   protected readonly modelCard = rxResource({ stream: () => this.api.modelCard() });
-  protected readonly assistant = rxResource({
-    params: () => this.canUseLanguageModel(),
-    stream: ({ params: allowed }) => (allowed ? this.api.assistant() : of(null)),
-  });
 
   protected readonly selectedId = signal<string | null>(null);
   protected readonly selected = computed<MachineRisk | null>(() => {
@@ -117,10 +95,6 @@ export class RiskCenter {
   protected readonly writingReport = signal(false);
   protected readonly reportError = signal<string | null>(null);
 
-  protected question = '';
-  protected readonly exchanges = signal<Exchange[]>([]);
-  protected readonly asking = signal(false);
-
   protected readonly errorMessage = computed(() => {
     const error = this.risks.error();
     return error ? describeError(error) : null;
@@ -153,26 +127,6 @@ export class RiskCenter {
         this.writingReport.set(false);
       },
     });
-  }
-
-  protected ask(text: string = this.question): void {
-    const question = text.trim();
-    if (!question || this.asking()) return;
-    this.question = '';
-    this.asking.set(true);
-    this.exchanges.update((list) => [{ question }, ...list]);
-    const settle = (result: Partial<Exchange>) => {
-      this.exchanges.update(([latest, ...rest]) => [{ ...latest, ...result }, ...rest]);
-      this.asking.set(false);
-    };
-    this.api.ask(question).subscribe({
-      next: (answer) => settle({ answer }),
-      error: (error) => settle({ error: describeError(error) }),
-    });
-  }
-
-  protected answerHtml(answer: AssistantAnswer): string {
-    return renderMarkdown(answer.answer);
   }
 
   /** "about 25 min", "about 3.5 h", or a dash when the sensor is not heading for its limit. */

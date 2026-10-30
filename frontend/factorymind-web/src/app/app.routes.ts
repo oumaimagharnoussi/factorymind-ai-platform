@@ -82,7 +82,8 @@ export const routes: Routes = [
       },
       {
         path: 'copilot',
-        ...soon('Maintenance copilot', 'weeks 12–13', 'Spring AI + RAG assistant that answers from machine manuals and cites its sources.'),
+        title: 'Maintenance copilot · FactoryMind AI',
+        loadComponent: () => import('./features/copilot/copilot').then((m) => m.Copilot),
       },
       {
         path: 'analytics',

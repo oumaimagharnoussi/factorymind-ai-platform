@@ -44,7 +44,6 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.MediaType;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
@@ -67,7 +66,7 @@ class InsightsIntegrationTest {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(Images.POSTGRES);
 
     @Container
     @ServiceConnection
@@ -160,11 +159,8 @@ class InsightsIntegrationTest {
                         .andExpect(jsonPath("$.machine").value("M-102 Hydraulic press"))
                         .andExpect(jsonPath("$.text").value(org.hamcrest.Matchers.containsString("follow up on WO-00043"))));
 
-        mvc.perform(post("/api/insights/ask").with(engineer)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"question\": \"Which machine first?\"}"))
-                .andExpect(status().isServiceUnavailable());
-        mvc.perform(get("/api/insights/assistant").with(engineer))
-                .andExpect(jsonPath("$.enabled").value(false));
+        mvc.perform(get("/api/insights/copilot").with(engineer))
+                .andExpect(jsonPath("$.chatModel").doesNotExist());
     }
 
     private void send(String topic, String key, String json) {

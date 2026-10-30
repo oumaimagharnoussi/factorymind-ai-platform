@@ -1,6 +1,6 @@
 # ADR 0005: Failure risk from a Python model, explained by Spring AI
 
-- Status: accepted
+- Status: accepted (the assistant became the maintenance copilot in ADR 0006)
 - Date: 2026-10-28
 
 ## Context
