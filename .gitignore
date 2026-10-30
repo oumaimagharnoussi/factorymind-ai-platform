@@ -12,3 +12,7 @@ dist/
 .DS_Store
 # Secrets
 .env
+
+# Power BI project: local settings and data cache stay on the PC
+analytics/powerbi/**/.pbi/localSettings.json
+analytics/powerbi/**/.pbi/cache.abf

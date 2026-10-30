@@ -24,6 +24,7 @@
         <module>maintenance-service</module>
         <module>inventory-service</module>
         <module>ai-insights-service</module>
+        <module>analytics-service</module>
         <module>api-gateway</module>
     </modules>
 

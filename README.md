@@ -15,7 +15,7 @@ a Python ML service and Power BI analytics.
 
 ![Work order](docs/demo/work-order.png)
 
-## What works today (phases 1–5)
+## What works today (phases 1–7)
 
 | Area | Status |
 |---|---|
@@ -37,7 +37,9 @@ a Python ML service and Power BI analytics.
 | Spring AI: maintenance report per machine (Claude or Ollama) | ✅ |
 | Maintenance copilot: RAG on machine manuals and procedures (hybrid search Postgres full-text + pgvector), cited sources, live plant data through tool calls, document upload (Markdown, text, PDF) | ✅ |
 | Preventive maintenance plans | Later |
-| Power BI reports | Weeks 12–13 |
+| Analytics warehouse (star schema) loaded every 5 min from the services, simulated 6-month history for the demo | ✅ |
+| Analytics page: availability, MTBF, MTTR, maintenance cost, prediction precision and recall, per machine | ✅ |
+| Power BI model and reports (Executive, Reliability & Maintenance, AI Performance) on the warehouse | ✅ |
 | Observability (Prometheus, Grafana) | Weeks 14–15 |
 
 ## Architecture
@@ -53,10 +55,12 @@ API Gateway (8080) ─┬─► asset-service (8081) ──────► Postg
                     ├─► maintenance-service (8084) ► PostgreSQL maintenance_db
                     │        │ REST: issue / return parts (token relayed)
                     ├─► inventory-service (8086) ──► PostgreSQL inventory_db
-                    └─► ai-insights-service (8087) ► PostgreSQL insights_db (+ pgvector: manuals)
-                             │ REST /predict           │ Spring AI (optional)
-                             ▼                         ▼
-                     ml-service (8090, Python)   Claude API or Ollama (chat), Ollama (embeddings)
+                    ├─► ai-insights-service (8087) ► PostgreSQL insights_db (+ pgvector: manuals)
+                    │        │ REST /predict           │ Spring AI (optional)
+                    │        ▼                         ▼
+                    │  ml-service (8090, Python)   Claude API or Ollama (chat), Ollama (embeddings)
+                    └─► analytics-service (8088) ──► PostgreSQL analytics_db (star schema) ◄── Power BI
+                             reads every service database above (read-only), every 5 min
 
 Kafka (9092)
   asset.sensor-definitions   asset ──► telemetry
@@ -83,6 +87,11 @@ The maintenance copilot answers "how do I fix / check / work safely on this mach
 procedures: it finds the best passages with Postgres full-text search and pgvector embeddings merged by rank,
 gives them to the language model with the live risks, alerts and work orders as tools, and the answer cites
 each passage as [n]. See [ADR 0006](docs/adr/0006-maintenance-copilot-rag.md).
+Every 5 minutes analytics-service copies what the reports need from the service databases (read-only) into a
+star-schema warehouse: work orders, downtime per day, predictions with their outcome, hourly sensor summaries.
+Power BI and the analytics page read it; on a fresh install it adds six months of simulated history so the trends
+have something to show. See [ADR 0007](docs/adr/0007-analytics-warehouse-power-bi.md) and
+[the KPI definitions](docs/analytics/kpi-definitions.md).
 Decisions are recorded in [`docs/adr`](docs/adr).
 
 ## Security
@@ -105,6 +114,7 @@ Every role can watch live and historical readings; pushing readings over HTTP ne
 | Work orders | Read, create | + edit, change status, book parts | Same as engineer |
 | Spare parts | Read | + create / edit parts, receive deliveries | + stock counts, delete parts |
 | AI | Read risks, ask the copilot | + machine reports, add / remove copilot documents | Same as engineer |
+| Analytics | Read KPIs | Same as operator | + start a warehouse load |
 
 Demo accounts (realm import in `infrastructure/keycloak/factorymind-realm.json`; change them before any real use):
 
@@ -122,7 +132,7 @@ Keycloak admin console: http://localhost:8180/auth/admin (`KEYCLOAK_ADMIN` / `KE
 Java 25 · Spring Boot 4.0.9 · Spring Cloud 2025.1.4 (Gateway) · Spring for Apache Kafka · Apache Kafka 4.3 (KRaft) ·
 Spring Data JPA · Flyway · PostgreSQL 17 + pgvector · Server-Sent Events ·
 Spring AI 2.0.1 (Anthropic Claude, Ollama, tool calling, embeddings, PDF reader) · RAG with hybrid search ·
-Python 3.13 · scikit-learn 1.9 · FastAPI · pytest ·
+Python 3.13 · scikit-learn 1.9 · FastAPI · pytest · Star-schema warehouse (Postgres) · Power BI (DAX, TMDL) ·
 Angular 22 (standalone components, signals, `rxResource`, reactive forms, Angular Material) · Vitest ·
 JUnit 5 · Mockito · Testcontainers · Docker Compose · GitHub Actions.
 
@@ -161,10 +171,12 @@ writing an answer; risk scoring never needs a language model. To let the copilot
 | http://localhost:8084/swagger-ui.html | maintenance-service API |
 | http://localhost:8086/swagger-ui.html | inventory-service API |
 | http://localhost:8087/swagger-ui.html | ai-insights-service API |
+| http://localhost:8088/swagger-ui.html | analytics-service API |
 | http://localhost:8090/docs | Python model API (internal; open in dev only) |
+| `localhost:5432`, database `analytics_db` | Power BI: see [the Power BI guide](docs/analytics/power-bi-guide.md) |
 
 Already ran an earlier phase? `docker compose up --build` is enough: the `db-init` container creates
-the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`, `insights_db`) in the existing Postgres volume.
+the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`, `insights_db`, `analytics_db`) in the existing Postgres volume.
 Coming from before phase 6, recreate the Postgres volume once (`docker compose down -v`): Postgres now runs on the
 Debian-based `pgvector/pgvector` image, whose text sorting differs from the old Alpine one. The demo data comes back
 on start.
@@ -182,6 +194,7 @@ SIMULATOR_ENABLED=true ./mvnw -pl telemetry-service spring-boot:run
 ./mvnw -pl inventory-service spring-boot:run
 ./mvnw -pl maintenance-service spring-boot:run
 ./mvnw -pl ai-insights-service spring-boot:run
+./mvnw -pl analytics-service spring-boot:run
 ./mvnw -pl api-gateway spring-boot:run
 
 # Python model (Python 3.13)
@@ -297,13 +310,23 @@ Errors use RFC 9457 problem details, for example:
 | POST | `/api/insights/knowledge/documents` | Multipart `file` (.md, .txt, .pdf, 10 MB) + `title`, `kind`, `machines`, ENGINEER/ADMIN |
 | DELETE | `/api/insights/knowledge/documents/{id}` | Remove an uploaded document (built-in ones: 409), ENGINEER/ADMIN |
 
+## API (analytics-service, through the gateway)
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/api/analytics/overview?from=&to=&factory=` | KPIs of a period (default: last 90 days): availability, downtime, failures, MTBF, MTTR, cost, prediction precision and recall |
+| GET | `/api/analytics/monthly?months=6&factory=` | The same per calendar month |
+| GET | `/api/analytics/assets?from=&to=&factory=` | Reliability per machine |
+| GET | `/api/analytics/status` | Last loads, first day with data, simulated history, factories, Power BI link |
+| POST | `/api/analytics/refresh` | Load the warehouse now (ADMIN) |
+
 ## Repository layout
 
 ```
-backend/          Maven multi-module: asset, telemetry, alert, maintenance, inventory, ai-insights services and api-gateway
+backend/          Maven multi-module: asset, telemetry, alert, maintenance, inventory, ai-insights, analytics services and api-gateway
 frontend/         Angular app (factorymind-web)
 ml/               Python failure-risk model: features, simulated training data, training, FastAPI service
-analytics/        Warehouse, ETL and Power BI (phase 4)
+analytics/        Power BI measures and project, warehouse overview (pipeline: backend/analytics-service)
 infrastructure/   Database init script, Keycloak realm, Caddy; later Prometheus, Grafana
 docs/             ADRs, architecture notes, screenshots
 ```

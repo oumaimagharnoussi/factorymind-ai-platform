@@ -194,6 +194,28 @@ services:
       ml-service:
         condition: service_healthy
 
+  analytics-service:
+    image: ${IMAGE_PREFIX}/analytics-service:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      ANALYTICS_DB_URL: jdbc:postgresql://postgres:5432/analytics_db
+      ANALYTICS_DB_USER: ${POSTGRES_USER}
+      ANALYTICS_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      ASSET_DB_URL: jdbc:postgresql://postgres:5432/asset_db
+      TELEMETRY_DB_URL: jdbc:postgresql://postgres:5432/telemetry_db
+      ALERT_DB_URL: jdbc:postgresql://postgres:5432/alert_db
+      MAINTENANCE_DB_URL: jdbc:postgresql://postgres:5432/maintenance_db
+      INSIGHTS_DB_URL: jdbc:postgresql://postgres:5432/insights_db
+      SOURCE_DB_USER: ${POSTGRES_USER}
+      SOURCE_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      ANALYTICS_DEMO_HISTORY: ${ANALYTICS_DEMO_HISTORY:-true}
+      POWERBI_REPORT_URL: ${POWERBI_REPORT_URL:-}
+      KEYCLOAK_ISSUER_URI: https://${DOMAIN}/auth/realms/factorymind
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
   api-gateway:
     image: ${IMAGE_PREFIX}/api-gateway:${IMAGE_TAG:-latest}
     restart: unless-stopped
@@ -204,6 +226,7 @@ services:
       MAINTENANCE_SERVICE_URL: http://maintenance-service:8084
       INVENTORY_SERVICE_URL: http://inventory-service:8086
       AI_INSIGHTS_SERVICE_URL: http://ai-insights-service:8087
+      ANALYTICS_SERVICE_URL: http://analytics-service:8088
       CORS_ALLOWED_ORIGINS: https://${DOMAIN}
       KEYCLOAK_ISSUER_URI: https://${DOMAIN}/auth/realms/factorymind
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
@@ -214,6 +237,7 @@ services:
       - maintenance-service
       - inventory-service
       - ai-insights-service
+      - analytics-service
 
   web:
     image: ${IMAGE_PREFIX}/web:${IMAGE_TAG:-latest}

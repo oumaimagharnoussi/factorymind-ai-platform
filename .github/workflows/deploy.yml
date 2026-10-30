@@ -49,6 +49,9 @@ jobs:
           - name: ai-insights-service
             context: backend
             module: ai-insights-service
+          - name: analytics-service
+            context: backend
+            module: analytics-service
           - name: ml-service
             context: ml/predictive-maintenance
             module: ""

@@ -241,6 +241,36 @@ services:
   # Optional free local models: docker compose --profile ollama up -d, then once:
   #   docker compose exec ollama ollama pull llama3.2           (chat, about 2 GB)    -> AI_CHAT_PROVIDER=ollama
   #   docker compose exec ollama ollama pull nomic-embed-text   (embeddings, 270 MB)  -> AI_EMBEDDING_PROVIDER=ollama
+  analytics-service:
+    build:
+      context: ./backend
+      args:
+        MODULE: analytics-service
+    environment:
+      ANALYTICS_DB_URL: jdbc:postgresql://postgres:5432/analytics_db
+      ANALYTICS_DB_USER: ${POSTGRES_USER:-factorymind}
+      ANALYTICS_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
+      # Read-only connections to the service databases (the pipeline sets every session read-only).
+      ASSET_DB_URL: jdbc:postgresql://postgres:5432/asset_db
+      TELEMETRY_DB_URL: jdbc:postgresql://postgres:5432/telemetry_db
+      ALERT_DB_URL: jdbc:postgresql://postgres:5432/alert_db
+      MAINTENANCE_DB_URL: jdbc:postgresql://postgres:5432/maintenance_db
+      INSIGHTS_DB_URL: jdbc:postgresql://postgres:5432/insights_db
+      SOURCE_DB_USER: ${POSTGRES_USER:-factorymind}
+      SOURCE_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
+      ANALYTICS_REFRESH_INTERVAL: ${ANALYTICS_REFRESH_INTERVAL:-PT5M}
+      ANALYTICS_DEMO_HISTORY: ${ANALYTICS_DEMO_HISTORY:-true}
+      POWERBI_REPORT_URL: ${POWERBI_REPORT_URL:-}
+      KEYCLOAK_ISSUER_URI: http://localhost:8180/auth/realms/factorymind
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
+    ports:
+      - "8088:8088"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_started
+
   ollama:
     image: ollama/ollama:0.40.3
     profiles: ["ollama"]
@@ -261,6 +291,7 @@ services:
       MAINTENANCE_SERVICE_URL: http://maintenance-service:8084
       INVENTORY_SERVICE_URL: http://inventory-service:8086
       AI_INSIGHTS_SERVICE_URL: http://ai-insights-service:8087
+      ANALYTICS_SERVICE_URL: http://analytics-service:8088
       CORS_ALLOWED_ORIGINS: http://localhost:4200
       KEYCLOAK_ISSUER_URI: http://localhost:8180/auth/realms/factorymind
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
@@ -273,6 +304,7 @@ services:
       - maintenance-service
       - inventory-service
       - ai-insights-service
+      - analytics-service
       - keycloak
 
   web:

@@ -9,6 +9,7 @@ COPY alert-service/pom.xml alert-service/pom.xml
 COPY maintenance-service/pom.xml maintenance-service/pom.xml
 COPY inventory-service/pom.xml inventory-service/pom.xml
 COPY ai-insights-service/pom.xml ai-insights-service/pom.xml
+COPY analytics-service/pom.xml analytics-service/pom.xml
 COPY api-gateway/pom.xml api-gateway/pom.xml
 RUN mvn -B -q -pl ${MODULE} -am dependency:go-offline
 COPY . .

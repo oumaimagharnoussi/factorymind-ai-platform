@@ -43,7 +43,8 @@ export const routes: Routes = [
       {
         path: 'monitoring',
         title: 'Live monitoring · FactoryMind AI',
-        loadComponent: () => import('./features/monitoring/live-monitoring').then((m) => m.LiveMonitoring),
+        loadComponent: () =>
+          import('./features/monitoring/live-monitoring').then((m) => m.LiveMonitoring),
       },
       {
         path: 'alerts',
@@ -53,17 +54,20 @@ export const routes: Routes = [
       {
         path: 'maintenance/orders',
         title: 'Work orders · FactoryMind AI',
-        loadComponent: () => import('./features/maintenance/work-order-list').then((m) => m.WorkOrderList),
+        loadComponent: () =>
+          import('./features/maintenance/work-order-list').then((m) => m.WorkOrderList),
       },
       {
         path: 'maintenance/orders/new',
         title: 'New work order · FactoryMind AI',
-        loadComponent: () => import('./features/maintenance/work-order-form').then((m) => m.WorkOrderForm),
+        loadComponent: () =>
+          import('./features/maintenance/work-order-form').then((m) => m.WorkOrderForm),
       },
       {
         path: 'maintenance/orders/:id',
         title: 'Work order · FactoryMind AI',
-        loadComponent: () => import('./features/maintenance/work-order-detail').then((m) => m.WorkOrderDetail),
+        loadComponent: () =>
+          import('./features/maintenance/work-order-detail').then((m) => m.WorkOrderDetail),
       },
       {
         path: 'inventory',
@@ -87,7 +91,8 @@ export const routes: Routes = [
       },
       {
         path: 'analytics',
-        ...soon('Analytics', 'weeks 12–13', 'Power BI reports: availability, downtime, MTBF/MTTR, maintenance cost and AI accuracy.'),
+        title: 'Analytics · FactoryMind AI',
+        loadComponent: () => import('./features/analytics/analytics').then((m) => m.Analytics),
       },
       { path: '**', redirectTo: 'dashboard' },
     ],

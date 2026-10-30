@@ -5,7 +5,12 @@ export type SensorType = 'TEMPERATURE' | 'VIBRATION' | 'PRESSURE' | 'ROTATION_SP
 
 export const ASSET_STATUSES: AssetStatus[] = ['OPERATIONAL', 'WARNING', 'STOPPED', 'MAINTENANCE'];
 export const CRITICALITIES: Criticality[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-export const SENSOR_TYPES: SensorType[] = ['TEMPERATURE', 'VIBRATION', 'PRESSURE', 'ROTATION_SPEED'];
+export const SENSOR_TYPES: SensorType[] = [
+  'TEMPERATURE',
+  'VIBRATION',
+  'PRESSURE',
+  'ROTATION_SPEED',
+];
 
 export interface Page<T> {
   content: T[];
@@ -137,8 +142,7 @@ export interface SensorStatusChange {
 }
 
 export type TelemetryEvent =
-  | { type: 'reading'; data: SensorSnapshot }
-  | { type: 'status'; data: SensorStatusChange };
+  { type: 'reading'; data: SensorSnapshot } | { type: 'status'; data: SensorStatusChange };
 
 // Alert service
 
@@ -207,11 +211,18 @@ export interface AlertEvent {
 export type WorkOrderType = 'CORRECTIVE' | 'PREVENTIVE' | 'INSPECTION';
 export type WorkOrderPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type WorkOrderStatus = 'OPEN' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
-export type ActivityType = 'CREATED' | 'UPDATED' | 'STATUS_CHANGED' | 'ALERT_LINKED' | 'PART_USED' | 'PART_RETURNED';
+export type ActivityType =
+  'CREATED' | 'UPDATED' | 'STATUS_CHANGED' | 'ALERT_LINKED' | 'PART_USED' | 'PART_RETURNED';
 
 export const WORK_ORDER_TYPES: WorkOrderType[] = ['CORRECTIVE', 'PREVENTIVE', 'INSPECTION'];
 export const WORK_ORDER_PRIORITIES: WorkOrderPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
-export const WORK_ORDER_STATUSES: WorkOrderStatus[] = ['OPEN', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED'];
+export const WORK_ORDER_STATUSES: WorkOrderStatus[] = [
+  'OPEN',
+  'IN_PROGRESS',
+  'ON_HOLD',
+  'COMPLETED',
+  'CANCELLED',
+];
 export const OPEN_WORK_ORDER_STATUSES: WorkOrderStatus[] = ['OPEN', 'IN_PROGRESS', 'ON_HOLD'];
 
 /** A row of the work order list. */
@@ -426,7 +437,13 @@ export interface ModelCard {
   trainedAt: string;
   horizonHours: number;
   decisionThreshold: number;
-  trainingData: { source: string; sensorLives: number; windows: number; positiveShare: number; testWindows: number };
+  trainingData: {
+    source: string;
+    sensorLives: number;
+    windows: number;
+    positiveShare: number;
+    testWindows: number;
+  };
   features: string[];
   featureImportances: Record<string, number>;
   metrics: {
@@ -526,4 +543,81 @@ export interface KnowledgeChunk {
 export interface KnowledgeDocumentDetail {
   document: KnowledgeDocument;
   chunks: KnowledgeChunk[];
+}
+
+// ---- analytics-service (warehouse KPIs, same definitions as the Power BI model) ----
+
+export interface PredictionKpis {
+  truePositives: number;
+  falseAlarms: number;
+  missedFailures: number;
+  pending: number;
+  precision: number | null;
+  recall: number | null;
+  averageLeadTimeHours: number | null;
+}
+
+export interface AnalyticsOverview {
+  from: string;
+  to: string;
+  factory: string | null;
+  machines: number;
+  operatingHours: number;
+  plannedDowntimeHours: number;
+  unplannedDowntimeHours: number;
+  availability: number | null;
+  failures: number;
+  mtbfHours: number | null;
+  mttrHours: number | null;
+  partsCost: number;
+  laborCost: number;
+  maintenanceCost: number;
+  correctiveOrders: number;
+  plannedOrders: number;
+  predictions: PredictionKpis;
+}
+
+export interface AnalyticsMonth {
+  month: string;
+  availability: number | null;
+  unplannedDowntimeHours: number;
+  failures: number;
+  mttrHours: number | null;
+  maintenanceCost: number;
+  correctiveOrders: number;
+  plannedOrders: number;
+  precision: number | null;
+  recall: number | null;
+}
+
+export interface AssetReliability {
+  assetCode: string;
+  assetName: string;
+  factory: string;
+  criticality: string;
+  failures: number;
+  unplannedDowntimeHours: number;
+  availability: number | null;
+  mtbfHours: number | null;
+  mttrHours: number | null;
+  maintenanceCost: number;
+}
+
+export interface EtlRun {
+  id: number;
+  trigger: string;
+  startedAt: string;
+  finishedAt: string | null;
+  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED';
+  rowCounts: string | null;
+  error: string | null;
+}
+
+export interface AnalyticsStatus {
+  lastLoad: string | null;
+  recentRuns: EtlRun[];
+  dataFrom: string | null;
+  simulatedHistory: boolean;
+  factories: string[];
+  powerBiReportUrl: string | null;
 }

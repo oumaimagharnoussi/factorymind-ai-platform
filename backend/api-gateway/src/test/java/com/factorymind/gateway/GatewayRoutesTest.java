@@ -46,6 +46,11 @@ class GatewayRoutesTest {
         assertThat(uriOf("ai-insights-service")).isEqualTo("http://localhost:8087");
     }
 
+    @Test
+    void analyticsRouteGoesToTheWarehouseService() {
+        assertThat(uriOf("analytics-service")).isEqualTo("http://localhost:8088");
+    }
+
     private String uriOf(String routeId) {
         Route route = routes.getRoutes().filter(r -> r.getId().equals(routeId)).blockFirst();
         assertThat(route).as("route %s", routeId).isNotNull();

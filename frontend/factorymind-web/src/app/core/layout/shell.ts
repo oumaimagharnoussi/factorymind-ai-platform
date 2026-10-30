@@ -45,6 +45,6 @@ export class Shell {
     { path: '/inventory', label: 'Spare parts', icon: 'inventory_2' },
     { path: '/ai-insights', label: 'AI risk center', icon: 'insights' },
     { path: '/copilot', label: 'Maintenance copilot', icon: 'smart_toy' },
-    { path: '/analytics', label: 'Analytics', icon: 'bar_chart', phase: 'Weeks 12–13' },
+    { path: '/analytics', label: 'Analytics', icon: 'bar_chart' },
   ];
 }

@@ -1,0 +1,224 @@
+<header class="page-header">
+  <div>
+    <h1>Analytics</h1>
+    <p class="subtitle">
+      Availability, downtime, repair times, maintenance cost and how well the failure-risk model
+      predicts failures. Loaded every few minutes from the plant's services into the analytics
+      warehouse that the Power BI reports read.
+    </p>
+  </div>
+  <div class="actions">
+    @if (status.value()?.powerBiReportUrl; as url) {
+      <a mat-flat-button [href]="url" target="_blank" rel="noopener">
+        <mat-icon>open_in_new</mat-icon> Open Power BI report
+      </a>
+    }
+    @if (canRefresh()) {
+      <button mat-stroked-button type="button" (click)="refresh()" [disabled]="refreshing()">
+        <mat-icon>sync</mat-icon> {{ refreshing() ? 'Loading…' : 'Load now' }}
+      </button>
+    }
+  </div>
+</header>
+
+@if (errorMessage(); as message) {
+  <p class="error-banner" role="alert"><mat-icon inline>error</mat-icon> {{ message }}</p>
+}
+@if (refreshError(); as message) {
+  <p class="error-banner" role="alert"><mat-icon inline>error</mat-icon> {{ message }}</p>
+}
+
+<section class="filters">
+  <mat-button-toggle-group
+    [value]="days()"
+    (change)="days.set($event.value)"
+    aria-label="Period"
+    hideSingleSelectionIndicator
+  >
+    <mat-button-toggle [value]="30">30 days</mat-button-toggle>
+    <mat-button-toggle [value]="90">90 days</mat-button-toggle>
+    <mat-button-toggle [value]="180">180 days</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="factory">
+    <mat-label>Factory</mat-label>
+    <mat-select [value]="factory() ?? ''" (selectionChange)="setFactory($event.value)">
+      <mat-option value="">All factories</mat-option>
+      @for (name of status.value()?.factories ?? []; track name) {
+        <mat-option [value]="name">{{ name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  @if (status.value(); as s) {
+    <span class="freshness secondary">
+      @if (s.lastLoad) {
+        Last load {{ s.lastLoad | date: 'short' }}
+      } @else {
+        Not loaded yet
+      }
+      @if (s.simulatedHistory) {
+        <span
+          class="simulated"
+          matTooltip="The months before today are simulated demo history (rows marked SIMULATED in the warehouse). Today's numbers come from the live services."
+        >
+          <mat-icon inline>science</mat-icon> includes simulated history
+        </span>
+      }
+    </span>
+  }
+</section>
+
+@if (overview.isLoading() && !overview.value()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+@if (overview.value(); as o) {
+  <section class="tiles" aria-label="Key figures">
+    <div class="tile">
+      <span class="name">Availability</span>
+      <strong>{{ o.availability == null ? '–' : (o.availability | percent: '1.1-1') }}</strong>
+      <span class="hint"
+        >{{ o.unplannedDowntimeHours | number: '1.0-1' }} h unplanned downtime</span
+      >
+    </div>
+    <div class="tile">
+      <span class="name">Failures</span>
+      <strong>{{ o.failures }}</strong>
+      <span class="hint"
+        >{{ o.machines }} machines · {{ o.from | date: 'mediumDate' }} –
+        {{ o.to | date: 'mediumDate' }}</span
+      >
+    </div>
+    <div class="tile">
+      <span class="name" matTooltip="Mean time between failures: running hours divided by failures"
+        >MTBF</span
+      >
+      <strong>{{ o.mtbfHours == null ? '–' : (o.mtbfHours | number: '1.0-0') + ' h' }}</strong>
+      <span class="hint">running time between failures</span>
+    </div>
+    <div class="tile">
+      <span
+        class="name"
+        matTooltip="Mean time to restore: from the failure until the work order is completed"
+        >MTTR</span
+      >
+      <strong>{{ o.mttrHours == null ? '–' : (o.mttrHours | number: '1.1-1') + ' h' }}</strong>
+      <span class="hint">failure to back in service</span>
+    </div>
+    <div class="tile">
+      <span class="name">Maintenance cost</span>
+      <strong>{{ o.maintenanceCost | number: '1.0-0' }} €</strong>
+      <span class="hint"
+        >{{ o.partsCost | number: '1.0-0' }} € parts · {{ o.laborCost | number: '1.0-0' }} €
+        labour</span
+      >
+    </div>
+    <div class="tile">
+      <span class="name">Planned vs corrective</span>
+      <strong>{{ o.plannedOrders }} / {{ o.correctiveOrders }}</strong>
+      <span class="hint">work orders opened</span>
+    </div>
+    <div class="tile">
+      <span
+        class="name"
+        matTooltip="Share of HIGH-risk predictions followed by a failure within 24 h"
+        >Prediction precision</span
+      >
+      <strong>{{
+        o.predictions.precision == null ? '–' : (o.predictions.precision | percent)
+      }}</strong>
+      <span class="hint">{{ o.predictions.falseAlarms }} false alarms</span>
+    </div>
+    <div class="tile">
+      <span class="name" matTooltip="Share of failures the model rated HIGH in the 24 h before"
+        >Failures predicted</span
+      >
+      <strong>{{ o.predictions.recall == null ? '–' : (o.predictions.recall | percent) }}</strong>
+      <span class="hint">
+        {{ o.predictions.missedFailures }} missed
+        @if (o.predictions.averageLeadTimeHours != null) {
+          · {{ o.predictions.averageLeadTimeHours | number: '1.0-1' }} h warning
+        }
+      </span>
+    </div>
+  </section>
+}
+
+<section class="charts">
+  <mat-card>
+    <mat-card-header><mat-card-title>Availability by month</mat-card-title></mat-card-header>
+    <mat-card-content>
+      <app-month-bars
+        [data]="availabilityBars()"
+        [format]="percent"
+        label="Availability by month"
+      />
+    </mat-card-content>
+  </mat-card>
+  <mat-card>
+    <mat-card-header><mat-card-title>Failures by month</mat-card-title></mat-card-header>
+    <mat-card-content>
+      <app-month-bars [data]="failureBars()" [format]="count" label="Failures by month" />
+    </mat-card-content>
+  </mat-card>
+  <mat-card>
+    <mat-card-header><mat-card-title>Maintenance cost by month</mat-card-title></mat-card-header>
+    <mat-card-content>
+      <app-month-bars [data]="costBars()" [format]="euros" label="Maintenance cost by month" />
+    </mat-card-content>
+  </mat-card>
+</section>
+
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>Reliability by machine</mat-card-title>
+    <mat-card-subtitle>Same period and factory as above</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Machine</th>
+          <th>Factory</th>
+          <th>Criticality</th>
+          <th class="num">Failures</th>
+          <th class="num">Downtime</th>
+          <th class="num">Availability</th>
+          <th class="num">MTBF</th>
+          <th class="num">MTTR</th>
+          <th class="num">Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (a of assets.value() ?? []; track a.assetCode) {
+          <tr>
+            <td>
+              <strong>{{ a.assetCode }}</strong> <span class="secondary">{{ a.assetName }}</span>
+            </td>
+            <td>{{ a.factory }}</td>
+            <td><app-status-chip [value]="a.criticality" /></td>
+            <td class="num">{{ a.failures }}</td>
+            <td class="num">{{ a.unplannedDowntimeHours | number: '1.0-1' }} h</td>
+            <td class="num">
+              {{ a.availability == null ? '–' : (a.availability | percent: '1.1-1') }}
+            </td>
+            <td class="num">
+              {{ a.mtbfHours == null ? '–' : (a.mtbfHours | number: '1.0-0') + ' h' }}
+            </td>
+            <td class="num">
+              {{ a.mttrHours == null ? '–' : (a.mttrHours | number: '1.1-1') + ' h' }}
+            </td>
+            <td class="num">{{ a.maintenanceCost | number: '1.0-0' }} €</td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="9" class="empty">
+              No machines in the warehouse yet. The first load runs a few seconds after start.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </mat-card-content>
+</mat-card>

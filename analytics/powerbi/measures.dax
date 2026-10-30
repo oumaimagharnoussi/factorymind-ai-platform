@@ -1,0 +1,131 @@
+// FactoryMind AI - DAX measures of the Power BI model.
+// Definitions: docs/analytics/kpi-definitions.md. The analytics page of the web app computes the same numbers.
+//
+// How to use (Power BI Desktop): DAX query view > paste this whole file > Run, then click
+// "Update model: Add new measure" above each MEASURE line (or "Update model with changes" for all of them).
+// The measures are then part of the model; save the report as a .pbip to keep them in Git as TMDL.
+
+DEFINE
+    // ---- Reliability (home table: Downtime) ------------------------------------------------------------
+    MEASURE Downtime[Machines] =
+        CALCULATE ( COUNTROWS ( Asset ), Asset[Removed] = FALSE () )
+    MEASURE Downtime[Days] =
+        COUNTROWS ( 'Calendar' )
+    // Every machine is meant to run around the clock; planned stops are taken out of that time.
+    MEASURE Downtime[Calendar Hours] =
+        [Machines] * [Days] * 24
+    MEASURE Downtime[Planned Downtime Hours] =
+        CALCULATE ( SUM ( Downtime[Hours] ), Downtime[Downtime Type] = "Planned" ) + 0
+    MEASURE Downtime[Unplanned Downtime Hours] =
+        CALCULATE ( SUM ( Downtime[Hours] ), Downtime[Downtime Type] = "Unplanned" ) + 0
+    MEASURE Downtime[Operating Hours] =
+        [Calendar Hours] - [Planned Downtime Hours]
+    MEASURE Downtime[Uptime Hours] =
+        [Operating Hours] - [Unplanned Downtime Hours]
+    MEASURE Downtime[Availability %] =
+        DIVIDE ( [Uptime Hours], [Operating Hours] )
+    // A failure is counted once, on the day it started (a stop over midnight has a row per day).
+    MEASURE Downtime[Failures] =
+        CALCULATE (
+            COUNTROWS ( Downtime ),
+            Downtime[Downtime Type] = "Unplanned",
+            Downtime[Is Event Start] = TRUE ()
+        ) + 0
+    MEASURE Downtime[MTBF (h)] =
+        DIVIDE ( [Uptime Hours], [Failures] )
+
+    // ---- Maintenance (home table: Maintenance) ---------------------------------------------------------
+    // Repairs are counted on the day they were completed: the inactive relationship on Completed Date Key.
+    MEASURE Maintenance[MTTR (h)] =
+        CALCULATE (
+            AVERAGE ( Maintenance[Restore Hours] ),
+            Maintenance[Maintenance Category] = "Corrective",
+            Maintenance[Status] = "COMPLETED",
+            USERELATIONSHIP ( Maintenance[Completed Date Key], 'Calendar'[Date Key] )
+        )
+    MEASURE Maintenance[Mean Response (h)] =
+        CALCULATE (
+            AVERAGE ( Maintenance[Response Hours] ),
+            Maintenance[Maintenance Category] = "Corrective"
+        )
+    MEASURE Maintenance[Mean Repair (h)] =
+        CALCULATE (
+            AVERAGE ( Maintenance[Repair Hours] ),
+            Maintenance[Maintenance Category] = "Corrective",
+            Maintenance[Status] = "COMPLETED",
+            USERELATIONSHIP ( Maintenance[Completed Date Key], 'Calendar'[Date Key] )
+        )
+    MEASURE Maintenance[Parts Cost] =
+        CALCULATE ( SUM ( Maintenance[Parts Cost] ), Maintenance[Status] <> "CANCELLED" ) + 0
+    MEASURE Maintenance[Labor Cost] =
+        CALCULATE ( SUM ( Maintenance[Labor Cost] ), Maintenance[Status] <> "CANCELLED" ) + 0
+    MEASURE Maintenance[Maintenance Cost] =
+        [Parts Cost] + [Labor Cost]
+    MEASURE Maintenance[Corrective Orders] =
+        CALCULATE (
+            COUNTROWS ( Maintenance ),
+            Maintenance[Maintenance Category] = "Corrective",
+            Maintenance[Status] <> "CANCELLED"
+        ) + 0
+    MEASURE Maintenance[Planned Orders] =
+        CALCULATE (
+            COUNTROWS ( Maintenance ),
+            Maintenance[Maintenance Category] = "Planned",
+            Maintenance[Status] <> "CANCELLED"
+        ) + 0
+    MEASURE Maintenance[Planned Share %] =
+        DIVIDE ( [Planned Orders], [Planned Orders] + [Corrective Orders] )
+    MEASURE Maintenance[Corrective Cost] =
+        CALCULATE ( [Maintenance Cost], Maintenance[Maintenance Category] = "Corrective" )
+    MEASURE Maintenance[Cost per Failure] =
+        DIVIDE ( [Corrective Cost], [Failures] )
+
+    // ---- AI performance (home table: Prediction) -------------------------------------------------------
+    MEASURE Prediction[True Positives] =
+        CALCULATE ( COUNTROWS ( Prediction ), Prediction[Outcome] = "True positive" ) + 0
+    MEASURE Prediction[False Alarms] =
+        CALCULATE ( COUNTROWS ( Prediction ), Prediction[Outcome] = "False alarm" ) + 0
+    MEASURE Prediction[Missed Failures] =
+        CALCULATE ( COUNTROWS ( Prediction ), Prediction[Outcome] = "Missed failure" ) + 0
+    MEASURE Prediction[Pending Predictions] =
+        CALCULATE ( COUNTROWS ( Prediction ), Prediction[Outcome] = "Pending" ) + 0
+    MEASURE Prediction[Precision %] =
+        DIVIDE ( [True Positives], [True Positives] + [False Alarms] )
+    MEASURE Prediction[Recall %] =
+        DIVIDE ( [True Positives], [True Positives] + [Missed Failures] )
+    MEASURE Prediction[False Alarm Rate %] =
+        DIVIDE ( [False Alarms], [True Positives] + [False Alarms] )
+    MEASURE Prediction[Avg Lead Time (h)] =
+        CALCULATE ( AVERAGE ( Prediction[Lead Time Hours] ), Prediction[Outcome] = "True positive" )
+
+    // ---- Sensors (home table: Telemetry) ---------------------------------------------------------------
+    MEASURE Telemetry[Avg Value] =
+        DIVIDE (
+            SUMX ( Telemetry, Telemetry[Average Value] * Telemetry[Readings] ),
+            SUM ( Telemetry[Readings] )
+        )
+    MEASURE Telemetry[Peak Value] =
+        MAX ( Telemetry[Max Value] )
+    MEASURE Telemetry[Warning Share %] =
+        DIVIDE ( SUM ( Telemetry[Warning Readings] ), SUM ( Telemetry[Readings] ) )
+    MEASURE Telemetry[Critical Share %] =
+        DIVIDE ( SUM ( Telemetry[Critical Readings] ), SUM ( Telemetry[Readings] ) )
+
+    // ---- Freshness -------------------------------------------------------------------------------------
+    MEASURE Refresh[Last Warehouse Load] =
+        MAX ( Refresh[Last Load] )
+
+// A quick check that every measure computes: one row per month.
+EVALUATE
+SUMMARIZECOLUMNS (
+    'Calendar'[Year Month],
+    "Availability", [Availability %],
+    "Failures", [Failures],
+    "MTBF h", [MTBF (h)],
+    "MTTR h", [MTTR (h)],
+    "Cost", [Maintenance Cost],
+    "Planned share", [Planned Share %],
+    "Precision", [Precision %],
+    "Recall", [Recall %]
+)
+ORDER BY 'Calendar'[Year Month]
