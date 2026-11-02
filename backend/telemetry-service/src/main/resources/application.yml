@@ -14,6 +14,11 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/auth/realms/factorymind/protocol/openid-connect/certs}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # Trace context travels in the record headers, so one trace follows a reading across services.
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
     consumer:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -52,11 +57,35 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+  # Observability (see docs/adr/0008): Prometheus scrapes /actuator/prometheus; every metric carries the service name.
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      # Latency buckets so Grafana can show p95 / p99 per endpoint.
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+  # Metrics are pulled by Prometheus, not pushed over OTLP; OTLP carries the traces only.
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  observations:
+    enable:
+      # One span per security filter on every request is noise in Tempo; the request span is enough.
+      spring.security: false
+  tracing:
+    # Every request is traced in the demo; lower it under real load (for example 0.1).
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  # Traces are exported only when MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT is set
+  # (docker compose: http://tempo:4318/v1/traces). Without it, trace ids still appear in the logs.
 
 springdoc:
   swagger-ui:

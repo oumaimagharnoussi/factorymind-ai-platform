@@ -31,7 +31,7 @@ public class SecurityConfig {
                 .authorizeExchange(auth -> auth
                         // CORS preflight carries no token; the gateway's globalcors answers it.
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                        .pathMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                        .pathMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .pathMatchers("/api/**").hasAnyRole("ADMIN", "ENGINEER", "OPERATOR")
                         .anyExchange().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2

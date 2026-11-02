@@ -22,13 +22,16 @@ public class ReadingProcessor {
     private final SensorStateRepository states;
     private final SensorThresholdRepository thresholds;
     private final ApplicationEventPublisher events;
+    private final TelemetryMetrics metrics;
 
     public ReadingProcessor(SensorReadingRepository readings, SensorStateRepository states,
-                            SensorThresholdRepository thresholds, ApplicationEventPublisher events) {
+                            SensorThresholdRepository thresholds, ApplicationEventPublisher events,
+                            TelemetryMetrics metrics) {
         this.readings = readings;
         this.states = states;
         this.thresholds = thresholds;
         this.events = events;
+        this.metrics = metrics;
     }
 
     @Transactional
@@ -36,6 +39,7 @@ public class ReadingProcessor {
         // Kafka delivers at least once: a reading seen before was fully handled already.
         if (readings.existsById(message.readingId())) {
             log.debug("Skipping duplicate reading {}", message.readingId());
+            metrics.duplicateSkipped();
             return;
         }
         SensorThreshold threshold = thresholds
@@ -43,6 +47,7 @@ public class ReadingProcessor {
                 .orElse(null);
         ReadingStatus status = ThresholdEvaluator.evaluate(message.value(), threshold);
         readings.save(new SensorReading(message, status));
+        metrics.readingStored(status);
 
         SensorKey key = new SensorKey(message.assetId(), message.sensorType());
         SensorState state = states.findById(key).orElse(null);
@@ -59,6 +64,7 @@ public class ReadingProcessor {
 
         events.publishEvent(SensorSnapshot.of(state, threshold));
         if (status != previous) {
+            metrics.statusChanged(status);
             events.publishEvent(new SensorStatusChangedMessage(message.assetId(), message.sensorType(), previous,
                     status, message.value(), threshold == null ? null : threshold.getUnit(),
                     threshold == null ? null : threshold.getWarningThreshold(),

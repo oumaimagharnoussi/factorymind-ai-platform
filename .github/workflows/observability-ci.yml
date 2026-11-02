@@ -1,0 +1,36 @@
+name: observability-ci
+
+on:
+  push:
+    paths: ["infrastructure/prometheus/**", "infrastructure/grafana/**", "infrastructure/tempo/**",
+            "docker-compose*.yml", ".github/workflows/observability-ci.yml"]
+  pull_request:
+    paths: ["infrastructure/prometheus/**", "infrastructure/grafana/**", "infrastructure/tempo/**",
+            "docker-compose*.yml", ".github/workflows/observability-ci.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prometheus configuration and alert rules (promtool)
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/infrastructure/prometheus:/etc/prometheus:ro" \
+            prom/prometheus:v3.15.1 check config /etc/prometheus/prometheus.yml
+      - name: Grafana dashboards are valid JSON with unique uids
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          uids = set()
+          for path in pathlib.Path("infrastructure/grafana/dashboards").glob("*.json"):
+              dashboard = json.loads(path.read_text())
+              assert dashboard["uid"] not in uids, f"duplicate uid in {path}"
+              uids.add(dashboard["uid"])
+              print(f"{path.name}: {len(dashboard['panels'])} panels")
+          PY
+      - name: Docker Compose files
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose -f docker-compose.prod.yml config --quiet

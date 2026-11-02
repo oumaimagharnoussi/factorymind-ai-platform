@@ -1,0 +1,48 @@
+# Prometheus pulls the metrics of every FactoryMind service every 15 s (http://localhost:9090).
+# Spring Boot services: /actuator/prometheus (Micrometer). Python model: /metrics (prometheus-client).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    platform: factorymind
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: spring-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - api-gateway:8080
+          - asset-service:8081
+          - telemetry-service:8082
+          - alert-service:8083
+          - maintenance-service:8084
+          - inventory-service:8086
+          - ai-insights-service:8087
+          - analytics-service:8088
+    relabel_configs:
+      # "asset-service:8081" -> service="asset-service", the name used on every dashboard.
+      - source_labels: [__address__]
+        regex: "([^:]+):.*"
+        target_label: service
+
+  - job_name: ml-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: [ml-service:8090]
+        labels:
+          service: ml-service
+
+  - job_name: tempo
+    static_configs:
+      - targets: [tempo:3200]
+        labels:
+          service: tempo
+
+  - job_name: prometheus
+    static_configs:
+      - targets: [localhost:9090]
+        labels:
+          service: prometheus

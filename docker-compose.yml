@@ -1,5 +1,10 @@
 name: factorymind
 
+# Shared by every Spring Boot service: send traces to Tempo (metrics are pulled by Prometheus).
+x-observability: &observability
+  MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://tempo:4318/v1/traces
+  TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
+
 services:
   postgres:
     # Postgres 17 with the pgvector extension (embeddings of the copilot's knowledge base).
@@ -91,6 +96,7 @@ services:
       args:
         MODULE: asset-service
     environment:
+      <<: *observability
       ASSET_DB_URL: jdbc:postgresql://postgres:5432/asset_db
       ASSET_DB_USER: ${POSTGRES_USER:-factorymind}
       ASSET_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
@@ -113,6 +119,7 @@ services:
       args:
         MODULE: telemetry-service
     environment:
+      <<: *observability
       TELEMETRY_DB_URL: jdbc:postgresql://postgres:5432/telemetry_db
       TELEMETRY_DB_USER: ${POSTGRES_USER:-factorymind}
       TELEMETRY_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
@@ -137,6 +144,7 @@ services:
       args:
         MODULE: alert-service
     environment:
+      <<: *observability
       ALERT_DB_URL: jdbc:postgresql://postgres:5432/alert_db
       ALERT_DB_USER: ${POSTGRES_USER:-factorymind}
       ALERT_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
@@ -161,6 +169,7 @@ services:
       args:
         MODULE: maintenance-service
     environment:
+      <<: *observability
       MAINTENANCE_DB_URL: jdbc:postgresql://postgres:5432/maintenance_db
       MAINTENANCE_DB_USER: ${POSTGRES_USER:-factorymind}
       MAINTENANCE_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
@@ -186,6 +195,7 @@ services:
       args:
         MODULE: inventory-service
     environment:
+      <<: *observability
       INVENTORY_DB_URL: jdbc:postgresql://postgres:5432/inventory_db
       INVENTORY_DB_USER: ${POSTGRES_USER:-factorymind}
       INVENTORY_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
@@ -211,6 +221,7 @@ services:
       args:
         MODULE: ai-insights-service
     environment:
+      <<: *observability
       INSIGHTS_DB_URL: jdbc:postgresql://postgres:5432/insights_db
       INSIGHTS_DB_USER: ${POSTGRES_USER:-factorymind}
       INSIGHTS_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
@@ -247,6 +258,7 @@ services:
       args:
         MODULE: analytics-service
     environment:
+      <<: *observability
       ANALYTICS_DB_URL: jdbc:postgresql://postgres:5432/analytics_db
       ANALYTICS_DB_USER: ${POSTGRES_USER:-factorymind}
       ANALYTICS_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
@@ -285,6 +297,7 @@ services:
       args:
         MODULE: api-gateway
     environment:
+      <<: *observability
       ASSET_SERVICE_URL: http://asset-service:8081
       TELEMETRY_SERVICE_URL: http://telemetry-service:8082
       ALERT_SERVICE_URL: http://alert-service:8083
@@ -314,9 +327,62 @@ services:
     depends_on:
       - api-gateway
 
-  # Next phases: notification-service, redis, prometheus, grafana.
+  # Observability (ADR 0008): metrics in Prometheus, traces in Tempo, both in Grafana.
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      # Exemplars link a latency point to its trace; the remote-write receiver takes Tempo's service graph.
+      - --enable-feature=exemplar-storage
+      - --web.enable-remote-write-receiver
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+
+  tempo:
+    image: grafana/tempo:2.10.10
+    command: ["-config.file=/etc/tempo.yml"]
+    # Runs as root so it can write to the named volume on Docker Desktop.
+    user: "0"
+    ports:
+      - "3200:3200"   # Tempo API (Grafana)
+      - "4318:4318"   # OTLP over HTTP: services started from the IDE send their traces here
+    volumes:
+      - ./infrastructure/tempo/tempo.yml:/etc/tempo.yml:ro
+      - tempo-data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:13.2.5
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Demo: dashboards open without a login (read-only); sign in as admin to edit.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/plant-operations.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - tempo
+
+  # Next phases: notification-service, redis.
 
 volumes:
   postgres-data:
   kafka-data:
   ollama-data:
+  prometheus-data:
+  tempo-data:
+  grafana-data:

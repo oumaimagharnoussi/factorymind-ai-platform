@@ -2,6 +2,11 @@
 # Only Caddy is reachable from the internet; it serves HTTPS and forwards /auth to Keycloak, the rest to the Angular/nginx container.
 name: factorymind
 
+# Shared by every Spring Boot service: traces to Tempo; metrics are pulled by Prometheus on the private network.
+x-observability: &observability
+  MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://tempo:4318/v1/traces
+  TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.2}
+
 services:
   postgres:
     # Postgres 17 with the pgvector extension (embeddings of the copilot's knowledge base).
@@ -85,6 +90,7 @@ services:
     image: ${IMAGE_PREFIX}/asset-service:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      <<: *observability
       ASSET_DB_URL: jdbc:postgresql://postgres:5432/asset_db
       ASSET_DB_USER: ${POSTGRES_USER}
       ASSET_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -101,6 +107,7 @@ services:
     image: ${IMAGE_PREFIX}/telemetry-service:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      <<: *observability
       TELEMETRY_DB_URL: jdbc:postgresql://postgres:5432/telemetry_db
       TELEMETRY_DB_USER: ${POSTGRES_USER}
       TELEMETRY_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -119,6 +126,7 @@ services:
     image: ${IMAGE_PREFIX}/alert-service:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      <<: *observability
       ALERT_DB_URL: jdbc:postgresql://postgres:5432/alert_db
       ALERT_DB_USER: ${POSTGRES_USER}
       ALERT_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -137,6 +145,7 @@ services:
     image: ${IMAGE_PREFIX}/maintenance-service:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      <<: *observability
       MAINTENANCE_DB_URL: jdbc:postgresql://postgres:5432/maintenance_db
       MAINTENANCE_DB_USER: ${POSTGRES_USER}
       MAINTENANCE_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -156,6 +165,7 @@ services:
     image: ${IMAGE_PREFIX}/inventory-service:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      <<: *observability
       INVENTORY_DB_URL: jdbc:postgresql://postgres:5432/inventory_db
       INVENTORY_DB_USER: ${POSTGRES_USER}
       INVENTORY_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -173,6 +183,7 @@ services:
     image: ${IMAGE_PREFIX}/ai-insights-service:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      <<: *observability
       INSIGHTS_DB_URL: jdbc:postgresql://postgres:5432/insights_db
       INSIGHTS_DB_USER: ${POSTGRES_USER}
       INSIGHTS_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -198,6 +209,7 @@ services:
     image: ${IMAGE_PREFIX}/analytics-service:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      <<: *observability
       ANALYTICS_DB_URL: jdbc:postgresql://postgres:5432/analytics_db
       ANALYTICS_DB_USER: ${POSTGRES_USER}
       ANALYTICS_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -220,6 +232,7 @@ services:
     image: ${IMAGE_PREFIX}/api-gateway:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      <<: *observability
       ASSET_SERVICE_URL: http://asset-service:8081
       TELEMETRY_SERVICE_URL: http://telemetry-service:8082
       ALERT_SERVICE_URL: http://alert-service:8083
@@ -245,6 +258,48 @@ services:
     depends_on:
       - api-gateway
 
+  # Observability (ADR 0008). Nothing here is published: Grafana is served by Caddy at https://$DOMAIN/grafana.
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --enable-feature=exemplar-storage
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+
+  tempo:
+    image: grafana/tempo:2.10.10
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yml"]
+    user: "0"
+    volumes:
+      - ./infrastructure/tempo/tempo.yml:/etc/tempo.yml:ro
+      - tempo-data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:13.2.5
+    restart: unless-stopped
+    environment:
+      GF_SERVER_ROOT_URL: https://${DOMAIN}/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/plant-operations.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - tempo
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -259,8 +314,12 @@ services:
     depends_on:
       - web
       - keycloak
+      - grafana
 
 volumes:
   postgres-data:
   kafka-data:
   caddy-data:
+  prometheus-data:
+  tempo-data:
+  grafana-data:

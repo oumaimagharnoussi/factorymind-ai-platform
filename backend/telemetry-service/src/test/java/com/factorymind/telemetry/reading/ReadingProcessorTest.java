@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.factorymind.telemetry.catalog.SensorThreshold;
 import com.factorymind.telemetry.catalog.SensorThresholdRepository;
 import com.factorymind.telemetry.catalog.SensorType;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -35,6 +37,11 @@ class ReadingProcessorTest {
 
     @Mock
     ApplicationEventPublisher events;
+
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
+    @Spy
+    TelemetryMetrics metrics = new TelemetryMetrics(registry);
 
     @InjectMocks
     ReadingProcessor processor;
@@ -59,6 +66,8 @@ class ReadingProcessorTest {
         assertThat(change.getValue().status()).isEqualTo(ReadingStatus.WARNING);
         assertThat(change.getValue().warningThreshold()).isEqualByComparingTo("75");
         verify(events).publishEvent(any(SensorSnapshot.class));
+        assertThat(count("factorymind.telemetry.readings", ReadingStatus.WARNING)).isEqualTo(1);
+        assertThat(count("factorymind.telemetry.status.changes", ReadingStatus.WARNING)).isEqualTo(1);
     }
 
     @Test
@@ -72,6 +81,8 @@ class ReadingProcessorTest {
         assertThat(state.getValue()).isEqualByComparingTo("61");
         verify(events).publishEvent(any(SensorSnapshot.class));
         verify(events, never()).publishEvent(any(SensorStatusChangedMessage.class));
+        assertThat(count("factorymind.telemetry.readings", ReadingStatus.NORMAL)).isEqualTo(1);
+        assertThat(count("factorymind.telemetry.status.changes", ReadingStatus.NORMAL)).isZero();
     }
 
     @Test
@@ -95,6 +106,11 @@ class ReadingProcessorTest {
 
         verify(readings, never()).save(any());
         verify(events, never()).publishEvent(any());
+        assertThat(registry.get("factorymind.telemetry.readings.duplicate").counter().count()).isEqualTo(1);
+    }
+
+    private double count(String name, ReadingStatus status) {
+        return registry.get(name).tag("status", status.name()).counter().count();
     }
 
     private SensorThreshold limits() {

@@ -29,11 +29,12 @@ public class AssetDirectory {
 
     private final RestClient http;
 
-    public AssetDirectory(@Value("${insights.asset-url:http://localhost:8081}") String baseUrl) {
+    public AssetDirectory(RestClient.Builder builder,
+                          @Value("${insights.asset-url:http://localhost:8081}") String baseUrl) {
         SimpleClientHttpRequestFactory timeouts = new SimpleClientHttpRequestFactory();
         timeouts.setConnectTimeout(Duration.ofSeconds(2));
         timeouts.setReadTimeout(Duration.ofSeconds(5));
-        this.http = RestClient.builder()
+        this.http = builder.clone()
                 .baseUrl(baseUrl)
                 .requestFactory(timeouts)
                 .requestInterceptor((request, body, execution) -> {

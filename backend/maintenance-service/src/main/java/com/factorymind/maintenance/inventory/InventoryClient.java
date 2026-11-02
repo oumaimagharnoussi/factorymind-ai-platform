@@ -32,11 +32,12 @@ public class InventoryClient {
 
     private final RestClient http;
 
-    public InventoryClient(@Value("${maintenance.inventory-url:http://localhost:8086}") String baseUrl) {
+    public InventoryClient(RestClient.Builder builder,
+                           @Value("${maintenance.inventory-url:http://localhost:8086}") String baseUrl) {
         SimpleClientHttpRequestFactory timeouts = new SimpleClientHttpRequestFactory();
         timeouts.setConnectTimeout(Duration.ofSeconds(2));
         timeouts.setReadTimeout(Duration.ofSeconds(5));
-        this.http = RestClient.builder()
+        this.http = builder.clone()
                 .baseUrl(baseUrl)
                 .requestFactory(timeouts)
                 .requestInterceptor((request, body, execution) -> {

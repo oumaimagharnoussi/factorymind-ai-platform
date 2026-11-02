@@ -2,5 +2,7 @@
 {$DOMAIN} {
     encode gzip
     reverse_proxy /auth/* keycloak:8080
+    # Dashboards and traces (Grafana login required in production).
+    reverse_proxy /grafana* grafana:3000
     reverse_proxy web:80
 }

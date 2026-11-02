@@ -28,15 +28,17 @@ public class AnalyticsPipeline {
     private final DemoHistory demoHistory;
     private final EtlRunStore runs;
     private final Clock clock;
+    private final EtlMetrics metrics;
     private final ReentrantLock running = new ReentrantLock();
 
     public AnalyticsPipeline(SourceExtractor extractor, WarehouseLoader loader, DemoHistory demoHistory,
-                             EtlRunStore runs, Clock clock) {
+                             EtlRunStore runs, Clock clock, EtlMetrics metrics) {
         this.extractor = extractor;
         this.loader = loader;
         this.demoHistory = demoHistory;
         this.runs = runs;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     @Scheduled(initialDelayString = "${analytics.initial-delay:PT20S}",
@@ -56,7 +58,7 @@ public class AnalyticsPipeline {
             try {
                 Optional<Map<String, Integer>> loaded = loader.load(extract(now), now);
                 if (loaded.isEmpty()) {
-                    runs.finish(id, clock.instant(), "SKIPPED", null, "Another instance was loading");
+                    finish(id, now, "SKIPPED", null, "Another instance was loading");
                 } else {
                     Map<String, Integer> counts = new LinkedHashMap<>(loaded.get());
                     int history = demoHistory.generateIfMissing(now);
@@ -65,17 +67,23 @@ public class AnalyticsPipeline {
                     }
                     String summary = counts.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue())
                             .collect(Collectors.joining(", "));
-                    runs.finish(id, clock.instant(), "SUCCEEDED", summary, null);
+                    finish(id, now, "SUCCEEDED", summary, null);
                     log.info("Warehouse loaded: {}", summary);
                 }
             } catch (RuntimeException e) {
                 log.warn("Warehouse load failed, the next run will try again: {}", e.getMessage());
-                runs.finish(id, clock.instant(), "FAILED", null, String.valueOf(e.getMessage()));
+                finish(id, now, "FAILED", null, String.valueOf(e.getMessage()));
             }
             return runs.find(id);
         } finally {
             running.unlock();
         }
+    }
+
+    private void finish(long id, Instant startedAt, String status, String summary, String error) {
+        Instant finishedAt = clock.instant();
+        runs.finish(id, finishedAt, status, summary, error);
+        metrics.recordRun(status, startedAt, finishedAt);
     }
 
     private Extract extract(Instant now) {

@@ -6,6 +6,7 @@ through the API gateway, so it carries no authentication of its own.
 
 import json
 import os
+import time
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -13,7 +14,8 @@ from typing import Literal
 
 import joblib
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
@@ -170,6 +172,14 @@ def predictor() -> Predictor:
 
 app = FastAPI(title="FactoryMind predictive maintenance model", version="1.0.0")
 
+# Scraped by Prometheus from /metrics (see infrastructure/prometheus/prometheus.yml).
+PREDICTIONS = Counter("factorymind_ml_predictions", "Machines scored, by the risk level returned", ["risk_level"])
+REJECTED = Counter("factorymind_ml_predictions_rejected", "Requests the model could not score (HTTP 422)")
+LATENCY = Histogram("factorymind_ml_prediction_duration_seconds", "Time to score one machine",
+                    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5))
+RISK_SCORE = Histogram("factorymind_ml_risk_score", "Distribution of the machine risk scores returned",
+                       buckets=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0))
+
 
 @app.get("/health")
 def health() -> dict:
@@ -184,7 +194,19 @@ def model_card() -> dict:
 
 @app.post("/predict", response_model=PredictionResponse, response_model_by_alias=True)
 def predict(request: PredictionRequest) -> PredictionResponse:
+    started = time.perf_counter()
     try:
-        return predictor().predict(request)
+        response = predictor().predict(request)
     except ValueError as e:
+        REJECTED.inc()
         raise HTTPException(status_code=422, detail=str(e)) from e
+    LATENCY.observe(time.perf_counter() - started)
+    PREDICTIONS.labels(risk_level=response.risk_level).inc()
+    RISK_SCORE.observe(response.risk_score)
+    return response
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> Response:
+    """Prometheus text format: prediction counts, latency and risk score distribution, plus process metrics."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

@@ -61,3 +61,17 @@ def test_model_card_and_health(client):
     card = client.get("/model").json()
     assert card["horizonHours"] == 24
     assert "log_hours_to_critical" in card["featureImportances"]
+
+
+def test_metrics_count_predictions(client):
+    body = {"assetId": "a1", "sensors": [sensor("TEMPERATURE", np.linspace(56, 75, 100))]}
+    level = client.post("/predict", json=body).json()["riskLevel"]
+    client.post("/predict", json={"assetId": "a1", "sensors": [sensor("TEMPERATURE", [60.0] * 5)]})
+
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert f'factorymind_ml_predictions_total{{risk_level="{level}"}}' in response.text
+    assert "factorymind_ml_predictions_rejected_total" in response.text
+    assert "factorymind_ml_prediction_duration_seconds_bucket" in response.text

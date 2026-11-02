@@ -20,11 +20,11 @@ public class ModelClient {
 
     private final RestClient http;
 
-    public ModelClient(@Value("${insights.model-url:http://localhost:8090}") String baseUrl) {
+    public ModelClient(RestClient.Builder builder, @Value("${insights.model-url:http://localhost:8090}") String baseUrl) {
         SimpleClientHttpRequestFactory timeouts = new SimpleClientHttpRequestFactory();
         timeouts.setConnectTimeout(Duration.ofSeconds(2));
         timeouts.setReadTimeout(Duration.ofSeconds(5));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(timeouts).build();
+        this.http = builder.clone().baseUrl(baseUrl).requestFactory(timeouts).build();
     }
 
     public Prediction predict(Prediction.Request request) {

@@ -15,7 +15,7 @@ a Python ML service and Power BI analytics.
 
 ![Work order](docs/demo/work-order.png)
 
-## What works today (phases 1–7)
+## What works today (phases 1–8)
 
 | Area | Status |
 |---|---|
@@ -40,7 +40,10 @@ a Python ML service and Power BI analytics.
 | Analytics warehouse (star schema) loaded every 5 min from the services, simulated 6-month history for the demo | ✅ |
 | Analytics page: availability, MTBF, MTTR, maintenance cost, prediction precision and recall, per machine | ✅ |
 | Power BI model and reports (Executive, Reliability & Maintenance, AI Performance) on the warehouse | ✅ |
-| Observability (Prometheus, Grafana) | Weeks 14–15 |
+| Metrics for every service in Prometheus: traffic, errors, latency, JVM, database pools, Kafka lag, plus plant metrics (readings, alerts, work orders by origin, failure risk, stock, warehouse loads) | ✅ |
+| Distributed tracing (OpenTelemetry, Grafana Tempo) across HTTP calls and Kafka, trace ids in every log line | ✅ |
+| Grafana dashboards (Plant operations, Services) and 14 Prometheus alert rules, provisioned as code | ✅ |
+| Alert routing (e-mail, Teams), central logs (Loki), contract tests | Later |
 
 ## Architecture
 
@@ -92,7 +95,27 @@ star-schema warehouse: work orders, downtime per day, predictions with their out
 Power BI and the analytics page read it; on a fresh install it adds six months of simulated history so the trends
 have something to show. See [ADR 0007](docs/adr/0007-analytics-warehouse-power-bi.md) and
 [the KPI definitions](docs/analytics/kpi-definitions.md).
+Every service exposes its metrics to Prometheus and sends its traces to Tempo; Grafana shows both. One trace
+follows a reading from the simulator through Kafka to the alert, the work order and back, and a dot on a latency
+graph opens the trace of that request. See [ADR 0008](docs/adr/0008-observability.md) and
+[Observability](#observability) below.
 Decisions are recorded in [`docs/adr`](docs/adr).
+
+## Observability
+
+| Where | What to look at |
+|---|---|
+| Grafana > FactoryMind > **Plant operations** (home page) | Machines, critical alerts and how fast they are acknowledged, work orders opened by ALERT / AI_PREDICTION / USER, risk per machine, model calls, spare parts, warehouse freshness |
+| Grafana > FactoryMind > **Services** | Up/down, requests, 4xx/5xx, p95 latency per service and slowest endpoints, calls between services, language model latency and tokens, Kafka throughput and lag, heap, CPU, GC, DB connections |
+| Grafana > Explore > Tempo > **Service graph** | Who calls whom (gateway, services, Kafka), with rate, errors and latency, drawn from the traces |
+| Grafana > Explore > Tempo > Search | One request across services: e.g. `service.name = maintenance-service`, then open a trace |
+| http://localhost:9090/alerts | The 14 alert rules (`infrastructure/prometheus/alerts.yml`) and which ones fire |
+
+Every Spring Boot service serves `/actuator/prometheus` (open on the Docker network only; nginx and Caddy never
+forward `/actuator`), the Python model serves `/metrics`. Log lines carry `[traceId-spanId]`, so
+`docker compose logs | findstr <traceId>` (Windows) or `grep` shows one request in every service.
+Started from the IDE, a service exports traces only if `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`
+is set (for example `http://localhost:4318/v1/traces` with the `tempo` container running).
 
 ## Security
 
@@ -133,6 +156,7 @@ Java 25 · Spring Boot 4.0.9 · Spring Cloud 2025.1.4 (Gateway) · Spring for Ap
 Spring Data JPA · Flyway · PostgreSQL 17 + pgvector · Server-Sent Events ·
 Spring AI 2.0.1 (Anthropic Claude, Ollama, tool calling, embeddings, PDF reader) · RAG with hybrid search ·
 Python 3.13 · scikit-learn 1.9 · FastAPI · pytest · Star-schema warehouse (Postgres) · Power BI (DAX, TMDL) ·
+Micrometer · Prometheus · OpenTelemetry · Grafana Tempo · Grafana (dashboards and alert rules as code) ·
 Angular 22 (standalone components, signals, `rxResource`, reactive forms, Angular Material) · Vitest ·
 JUnit 5 · Mockito · Testcontainers · Docker Compose · GitHub Actions.
 
@@ -174,6 +198,8 @@ writing an answer; risk scoring never needs a language model. To let the copilot
 | http://localhost:8088/swagger-ui.html | analytics-service API |
 | http://localhost:8090/docs | Python model API (internal; open in dev only) |
 | `localhost:5432`, database `analytics_db` | Power BI: see [the Power BI guide](docs/analytics/power-bi-guide.md) |
+| http://localhost:3000 | Grafana: dashboards and traces (open without login; `admin` / `GRAFANA_ADMIN_PASSWORD` to edit) |
+| http://localhost:9090 | Prometheus: metrics, targets (`/targets`), alert rules (`/alerts`) |
 
 Already ran an earlier phase? `docker compose up --build` is enough: the `db-init` container creates
 the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`, `insights_db`, `analytics_db`) in the existing Postgres volume.
@@ -185,6 +211,7 @@ on start.
 
 ```bash
 docker compose up -d postgres db-init kafka kafka-ui keycloak
+docker compose up -d prometheus tempo grafana   # optional: dashboards and traces
 
 # Backend (JDK 25; with JDK 21 add -Djava.version=21), one terminal each
 cd backend
@@ -327,6 +354,6 @@ backend/          Maven multi-module: asset, telemetry, alert, maintenance, inve
 frontend/         Angular app (factorymind-web)
 ml/               Python failure-risk model: features, simulated training data, training, FastAPI service
 analytics/        Power BI measures and project, warehouse overview (pipeline: backend/analytics-service)
-infrastructure/   Database init script, Keycloak realm, Caddy; later Prometheus, Grafana
+infrastructure/   Database init script, Keycloak realm, Caddy, Prometheus (scrape + alert rules), Tempo, Grafana (data sources, dashboards)
 docs/             ADRs, architecture notes, screenshots
 ```

@@ -1,0 +1,133 @@
+# Alert rules, evaluated by Prometheus every 15 s. See them firing at http://localhost:9090/alerts
+# (and in Grafana > Alerting). Routing them to e-mail or Teams would need an Alertmanager (not in the demo).
+groups:
+  - name: platform
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} is down"
+          description: "Prometheus has not reached {{ $labels.instance }} for more than a minute."
+
+      - alert: HighServerErrorRate
+        expr: |
+          sum by (service) (rate(http_server_requests_seconds_count{status=~"5..", uri!~"/actuator.*"}[5m]))
+            / sum by (service) (rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }}: {{ $value | humanizePercentage }} of requests fail with 5xx"
+
+      - alert: SlowApi
+        # Server-Sent Events streams stay open for minutes by design, so they are left out.
+        expr: |
+          histogram_quantile(0.95, sum by (service, le) (rate(http_server_requests_seconds_bucket{uri!~"/actuator.*|.*/stream"}[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }}: 95% of requests take up to {{ $value | humanizeDuration }}"
+
+      - alert: JvmHeapAlmostFull
+        expr: |
+          sum by (service) (jvm_memory_used_bytes{area="heap"}) / sum by (service) (jvm_memory_max_bytes{area="heap"} > 0) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} uses {{ $value | humanizePercentage }} of its heap"
+
+      - alert: KafkaConsumerLagging
+        expr: max by (service, client_id) (kafka_consumer_fetch_manager_records_lag_max) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} ({{ $labels.client_id }}) is {{ $value }} messages behind"
+
+      - alert: KafkaListenerErrors
+        # A failing message is retried twice, then copied to <topic>-dlt by the error handler.
+        expr: sum by (service, messaging_source_name) (increase(spring_kafka_listener_seconds_count{error!="none"}[10m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} failed to handle messages from {{ $labels.messaging_source_name }}"
+          description: "Check the logs and the dead-letter topic {{ $labels.messaging_source_name }}-dlt in Kafka UI."
+
+  - name: plant
+    rules:
+      - alert: CriticalAlertNotAcknowledged
+        expr: factorymind_alerts_unacknowledged > 0 and factorymind_alerts_unresolved{severity="CRITICAL"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} alert(s) waiting for an operator for more than 10 minutes"
+
+      - alert: MachineAtHighRisk
+        expr: factorymind_insights_machines{risk_level="HIGH"} > 0
+        for: 2m
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ $value }} machine(s) likely to reach a critical limit within 24 h"
+
+      - alert: WorkOrdersOverdue
+        expr: factorymind_workorders_overdue > 0
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ $value }} work order(s) past their due date"
+
+      - alert: SparePartsLow
+        expr: factorymind_inventory_parts_out_of_stock > 0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ $value }} spare part(s) out of stock"
+
+      - alert: NoReadingsReceived
+        # The simulator (or the plant gateways) went quiet: nothing reaches the risk model or the alerts.
+        expr: sum(rate(factorymind_telemetry_readings_total[5m])) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No sensor reading stored for 5 minutes"
+
+  - name: data-and-ai
+    rules:
+      - alert: WarehouseStale
+        # Loads run every 5 minutes; Power BI and the analytics page show stale numbers after 3 missed loads.
+        expr: |
+          factorymind_analytics_etl_last_success_seconds > 0
+            and time() - factorymind_analytics_etl_last_success_seconds > 900
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The analytics warehouse has not loaded for {{ $value | humanizeDuration }}"
+
+      - alert: WarehouseLoadFailing
+        expr: increase(factorymind_analytics_etl_seconds_count{status="FAILED"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A warehouse load failed in the last 15 minutes"
+
+      - alert: PredictionModelErrors
+        expr: |
+          sum(rate(http_client_requests_seconds_count{service="ai-insights-service", uri="/predict", outcome!="SUCCESS"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ai-insights-service gets errors from the prediction model"
