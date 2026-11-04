@@ -52,6 +52,9 @@ jobs:
           - name: analytics-service
             context: backend
             module: analytics-service
+          - name: notification-service
+            context: backend
+            module: notification-service
           - name: ml-service
             context: ml/predictive-maintenance
             module: ""

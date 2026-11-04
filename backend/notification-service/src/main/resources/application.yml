@@ -1,0 +1,124 @@
+server:
+  port: ${SERVER_PORT:8089}
+
+spring:
+  application:
+    name: notification-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Must equal the "iss" claim of the tokens the browser gets from Keycloak.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/auth/realms/factorymind}
+          # Signing keys; inside Docker this goes to keycloak:8080 while the issuer stays the public URL.
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/auth/realms/factorymind/protocol/openid-connect/certs}
+      # The service's own login (client credentials) to read machine names from asset-service.
+      client:
+        registration:
+          asset-service:
+            provider: keycloak
+            client-id: ${NOTIFICATION_CLIENT_ID:notification-service}
+            client-secret: ${NOTIFICATION_CLIENT_SECRET:notification-service-secret}
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak:
+            # Inside Docker: keycloak:8080. The token's issuer stays the public URL (KC_HOSTNAME).
+            token-uri: ${KEYCLOAK_TOKEN_URI:http://localhost:8180/auth/realms/factorymind/protocol/openid-connect/token}
+  # SMTP server. The demo uses Mailpit (http://localhost:8025 shows every e-mail sent).
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # Trace context travels in the record headers, so one trace follows a reading across services.
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Bytes in, objects out: KafkaConfig's message converter maps JSON to each listener's parameter type.
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+    # Only used to copy unreadable messages to the dead-letter topics.
+    producer:
+      properties:
+        max.block.ms: 5000
+  datasource:
+    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5432/notification_db}
+    username: ${NOTIFICATION_DB_USER:factorymind}
+    password: ${NOTIFICATION_DB_PASSWORD:factorymind}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+
+notification:
+  # Machine names for the messages (called with the service's own token).
+  asset-url: ${ASSET_SERVICE_URL:http://localhost:8081}
+  # Shared secret Alertmanager sends as a bearer token. Empty: the webhook refuses every call.
+  alertmanager:
+    token: ${ALERTMANAGER_WEBHOOK_TOKEN:}
+  # Notifications (and their deliveries) older than this are deleted every night.
+  retention: ${NOTIFICATION_RETENTION:P30D}
+  delivery:
+    poll-interval: ${NOTIFICATION_POLL_INTERVAL:PT2S}
+    batch-size: 20
+    max-attempts: ${NOTIFICATION_MAX_ATTEMPTS:6}
+    first-retry: ${NOTIFICATION_FIRST_RETRY:PT15S}
+    max-retry: ${NOTIFICATION_MAX_RETRY:PT15M}
+    # Links in e-mails and Teams cards point here.
+    app-url: ${APP_PUBLIC_URL:http://localhost:4200}
+    mail-from: ${MAIL_FROM:FactoryMind AI <notifications@factorymind.local>}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    # A mail server that is down must not mark the service down: deliveries wait and retry.
+    mail:
+      enabled: false
+  # Observability (see docs/adr/0008): Prometheus scrapes /actuator/prometheus; every metric carries the service name.
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      # Latency buckets so Grafana can show p95 / p99 per endpoint.
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+  # Metrics are pulled by Prometheus, not pushed over OTLP; OTLP carries the traces only.
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  observations:
+    enable:
+      # One span per security filter on every request is noise in Tempo; the request span is enough.
+      spring.security: false
+  tracing:
+    # Every request is traced in the demo; lower it under real load (for example 0.1).
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  # Traces are exported only when MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT is set
+  # (docker compose: http://tempo:4318/v1/traces). Without it, trace ids still appear in the logs.
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

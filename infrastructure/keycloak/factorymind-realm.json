@@ -34,6 +34,20 @@
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "+"
       }
+    },
+    {
+      "clientId": "notification-service",
+      "name": "Notification service (service account)",
+      "description": "notification-service logs in as itself (OAuth2 client credentials) to read machine names from asset-service",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${NOTIFICATION_CLIENT_SECRET:notification-service-secret}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
     }
   ],
   "users": [
@@ -65,6 +79,12 @@
       "enabled": true,
       "emailVerified": true,
       "credentials": [{ "type": "password", "value": "operator", "temporary": false }],
+      "realmRoles": ["OPERATOR"]
+    },
+    {
+      "username": "service-account-notification-service",
+      "enabled": true,
+      "serviceAccountClientId": "notification-service",
       "realmRoles": ["OPERATOR"]
     }
   ]

@@ -85,6 +85,8 @@ services:
       # Tokens always carry this issuer, whether the browser or a container asked for them.
       KC_HOSTNAME: http://localhost:8180/auth
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      # Read by the realm file: secret of notification-service's own login (same value as in notification-service).
+      NOTIFICATION_CLIENT_SECRET: ${NOTIFICATION_CLIENT_SECRET:-notification-service-secret}
     ports:
       - "8180:8080"
     volumes:
@@ -283,6 +285,49 @@ services:
       keycloak:
         condition: service_started
 
+  # Phase 9 (ADR 0009): routes alerts, work orders, AI risk and Prometheus alerts to e-mail, Teams and the app.
+  notification-service:
+    build:
+      context: ./backend
+      args:
+        MODULE: notification-service
+    environment:
+      <<: *observability
+      NOTIFICATION_DB_URL: jdbc:postgresql://postgres:5432/notification_db
+      NOTIFICATION_DB_USER: ${POSTGRES_USER:-factorymind}
+      NOTIFICATION_DB_PASSWORD: ${POSTGRES_PASSWORD:-factorymind}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      APP_PUBLIC_URL: http://localhost:4200
+      ALERTMANAGER_WEBHOOK_TOKEN: ${ALERTMANAGER_WEBHOOK_TOKEN:-factorymind-dev-webhook-token}
+      # Its own Keycloak login (client credentials) to read machine names from asset-service.
+      ASSET_SERVICE_URL: http://asset-service:8081
+      NOTIFICATION_CLIENT_SECRET: ${NOTIFICATION_CLIENT_SECRET:-notification-service-secret}
+      KEYCLOAK_TOKEN_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/token
+      KEYCLOAK_ISSUER_URI: http://localhost:8180/auth/realms/factorymind
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
+    ports:
+      - "8089:8089"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      mailpit:
+        condition: service_started
+
+  # Catches every e-mail the platform sends (nothing leaves the machine): http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.31.0
+    environment:
+      MP_MAX_MESSAGES: 2000
+    ports:
+      - "8025:8025"   # web inbox
+      - "1025:1025"   # SMTP, for services started from the IDE
+
   ollama:
     image: ollama/ollama:0.40.3
     profiles: ["ollama"]
@@ -305,6 +350,7 @@ services:
       INVENTORY_SERVICE_URL: http://inventory-service:8086
       AI_INSIGHTS_SERVICE_URL: http://ai-insights-service:8087
       ANALYTICS_SERVICE_URL: http://analytics-service:8088
+      NOTIFICATION_SERVICE_URL: http://notification-service:8089
       CORS_ALLOWED_ORIGINS: http://localhost:4200
       KEYCLOAK_ISSUER_URI: http://localhost:8180/auth/realms/factorymind
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/factorymind/protocol/openid-connect/certs
@@ -318,6 +364,7 @@ services:
       - inventory-service
       - ai-insights-service
       - analytics-service
+      - notification-service
       - keycloak
 
   web:
@@ -343,6 +390,23 @@ services:
       - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./infrastructure/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
+
+  # Groups Prometheus alerts and hands them to notification-service, which applies the routing rules (ADR 0009).
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    # The webhook token comes from the environment: written to a file the config reads, then Alertmanager starts.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - printf '%s' "$$ALERTMANAGER_WEBHOOK_TOKEN" > /tmp/webhook-token &&
+        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
+    environment:
+      ALERTMANAGER_WEBHOOK_TOKEN: ${ALERTMANAGER_WEBHOOK_TOKEN:-factorymind-dev-webhook-token}
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./infrastructure/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
 
   tempo:
     image: grafana/tempo:2.10.10
@@ -377,7 +441,7 @@ services:
       - prometheus
       - tempo
 
-  # Next phases: notification-service, redis.
+  # Next phases: central logs (Loki), redis.
 
 volumes:
   postgres-data:
@@ -386,3 +450,4 @@ volumes:
   prometheus-data:
   tempo-data:
   grafana-data:
+  alertmanager-data:

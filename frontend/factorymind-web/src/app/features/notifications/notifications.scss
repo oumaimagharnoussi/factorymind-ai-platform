@@ -1,0 +1,178 @@
+.page-header a mat-icon {
+  margin-right: 4px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fm-text-muted);
+  font-size: 13px;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--fm-border);
+
+  &.clickable {
+    cursor: pointer;
+
+    &:hover {
+      background: var(--fm-hover);
+    }
+  }
+
+  &.unread {
+    box-shadow: inset 3px 0 0 var(--fm-accent);
+
+    .title {
+      font-weight: 600;
+    }
+  }
+
+  .body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .title-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .external {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: var(--fm-text-muted);
+  }
+
+  .message {
+    margin: 6px 0 4px;
+  }
+
+  .meta {
+    font-size: 12px;
+    color: var(--fm-text-muted);
+  }
+}
+
+.source {
+  margin-top: 2px;
+
+  &.critical {
+    color: var(--fm-bad);
+  }
+  &.warning {
+    color: var(--fm-warn);
+  }
+  &.info {
+    color: var(--fm-info);
+  }
+}
+
+.empty {
+  padding: 24px 16px;
+  color: var(--fm-text-muted);
+}
+
+.channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--fm-text-muted);
+  }
+}
+
+.secondary {
+  color: var(--fm-text-muted);
+  font-size: 12px;
+}
+
+.error-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  color: var(--fm-bad);
+  cursor: help;
+}
+
+table {
+  width: 100%;
+}
+
+// Routing rules page
+.rule-form {
+  margin-bottom: 16px;
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 4px 16px;
+  }
+
+  .wide {
+    grid-column: 1 / -1;
+  }
+
+  .buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+}
+
+.test-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  background: var(--fm-ok-bg);
+  color: var(--fm-ok);
+
+  &.failed {
+    background: var(--fm-bad-bg);
+    color: var(--fm-bad);
+  }
+
+  span {
+    flex: 1;
+  }
+}
+
+.disabled-rule td {
+  opacity: 0.55;
+}

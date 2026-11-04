@@ -1,0 +1,209 @@
+<header class="page-header">
+  <div>
+    <h1>Notifications</h1>
+    <p class="subtitle">
+      Sensor alerts, work orders, AI failure warnings and platform alerts, routed to your role by
+      the routing rules. Critical ones also go out by e-mail{{
+        canSeeDeliveries ? ' (see the delivery log)' : ''
+      }}.
+    </p>
+  </div>
+  @if (canSeeDeliveries) {
+    <a mat-stroked-button routerLink="/notifications/rules">
+      <mat-icon>alt_route</mat-icon>
+      Routing rules
+    </a>
+  }
+</header>
+
+<mat-tab-group animationDuration="0ms" mat-stretch-tabs="false">
+  <mat-tab label="My notifications">
+    <div class="filters">
+      <mat-button-toggle-group
+        [value]="unreadOnly()"
+        (change)="setUnreadOnly($event.value)"
+        aria-label="Notifications to show"
+      >
+        <mat-button-toggle [value]="false">All</mat-button-toggle>
+        <mat-button-toggle [value]="true">Unread</mat-button-toggle>
+      </mat-button-toggle-group>
+      <button mat-button (click)="markAllRead()">
+        <mat-icon>done_all</mat-icon>
+        Mark all as read
+      </button>
+    </div>
+
+    <div class="table-card">
+      @if (feed.isLoading()) {
+        <mat-progress-bar mode="indeterminate" />
+      }
+      <ul class="feed">
+        @for (n of feed.value()?.content ?? []; track n.id) {
+          <li class="entry" [class.unread]="!n.read" [class.clickable]="!!n.link" (click)="open(n)">
+            <mat-icon
+              [class]="'source ' + n.severity.toLowerCase()"
+              [matTooltip]="sourceLabels[n.source]"
+            >
+              {{ sourceIcons[n.source] }}
+            </mat-icon>
+            <div class="body">
+              <div class="title-line">
+                <app-status-chip [value]="n.severity" />
+                <span class="title">{{ n.title }}</span>
+                @if (isExternal(n.link)) {
+                  <mat-icon class="external" matTooltip="Opens the monitoring tool"
+                    >open_in_new</mat-icon
+                  >
+                }
+              </div>
+              @if (n.message) {
+                <p class="message">{{ n.message }}</p>
+              }
+              <span class="meta">
+                {{ sourceLabels[n.source] }}
+                @if (n.assetLabel) {
+                  · {{ n.assetLabel }}
+                }
+                · {{ n.createdAt | date: 'MMM d, y, HH:mm' }}
+              </span>
+            </div>
+            @if (!n.read) {
+              <button
+                mat-icon-button
+                matTooltip="Mark as read"
+                (click)="markRead(n, $event)"
+                aria-label="Mark as read"
+              >
+                <mat-icon>mark_email_read</mat-icon>
+              </button>
+            }
+          </li>
+        } @empty {
+          @if (!feed.isLoading()) {
+            <li class="empty">
+              {{ unreadOnly() ? 'All caught up.' : 'No notifications for your role yet.' }}
+            </li>
+          }
+        }
+      </ul>
+      <mat-paginator
+        [length]="feed.value()?.totalElements ?? 0"
+        [pageIndex]="page().index"
+        [pageSize]="page().size"
+        [pageSizeOptions]="[20, 50, 100]"
+        (page)="onPage($event)"
+      />
+    </div>
+  </mat-tab>
+
+  @if (canSeeDeliveries) {
+    <mat-tab label="Delivery log">
+      <div class="filters">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Status</mat-label>
+          <mat-select
+            [value]="deliveryStatus()"
+            (selectionChange)="setDeliveryStatus($event.value)"
+          >
+            <mat-option [value]="null">Any status</mat-option>
+            <mat-option value="SENT">Sent</mat-option>
+            <mat-option value="PENDING">Pending / retrying</mat-option>
+            <mat-option value="FAILED">Failed</mat-option>
+            <mat-option value="SUPPRESSED">Throttled</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Channel</mat-label>
+          <mat-select
+            [value]="deliveryChannel()"
+            (selectionChange)="setDeliveryChannel($event.value)"
+          >
+            <mat-option [value]="null">Any channel</mat-option>
+            <mat-option value="EMAIL">E-mail</mat-option>
+            <mat-option value="TEAMS">Microsoft Teams</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <span class="hint">
+          <mat-icon>mail</mat-icon>
+          Demo e-mails land in
+          <a href="http://localhost:8025" target="_blank" rel="noopener">Mailpit</a>.
+        </span>
+      </div>
+
+      <div class="table-card">
+        @if (deliveries.isLoading()) {
+          <mat-progress-bar mode="indeterminate" />
+        }
+        <table mat-table [dataSource]="deliveries.value()?.content ?? []">
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let d">
+              <app-status-chip [value]="d.status === 'SUPPRESSED' ? 'THROTTLED' : d.status" />
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="channel">
+            <th mat-header-cell *matHeaderCellDef>Sent to</th>
+            <td mat-cell *matCellDef="let d">
+              <span class="channel">
+                <mat-icon>{{ channelIcons[d.channel] }}</mat-icon>
+                {{ d.recipient }}
+              </span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="event">
+            <th mat-header-cell *matHeaderCellDef>Event</th>
+            <td mat-cell *matCellDef="let d">
+              <app-status-chip [value]="d.severity" />
+              {{ d.title }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="rule">
+            <th mat-header-cell *matHeaderCellDef>Rule</th>
+            <td mat-cell *matCellDef="let d" class="secondary">{{ d.ruleName }}</td>
+          </ng-container>
+          <ng-container matColumnDef="attempts">
+            <th mat-header-cell *matHeaderCellDef>Attempts</th>
+            <td mat-cell *matCellDef="let d">
+              {{ d.attempts }}
+              @if (d.lastError) {
+                <mat-icon class="error-icon" [matTooltip]="d.lastError">info</mat-icon>
+              }
+              @if (d.status === 'PENDING' && d.nextAttemptAt && d.attempts > 0) {
+                <div class="secondary">next {{ d.nextAttemptAt | date: 'HH:mm:ss' }}</div>
+              }
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="created">
+            <th mat-header-cell *matHeaderCellDef>Created</th>
+            <td mat-cell *matCellDef="let d">{{ d.createdAt | date: 'MMM d, HH:mm:ss' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let d">
+              @if (canRetry(d)) {
+                <button mat-button (click)="retry(d)">
+                  <mat-icon>replay</mat-icon>
+                  Send again
+                </button>
+              }
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="deliveryColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: deliveryColumns"></tr>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="empty" [attr.colspan]="deliveryColumns.length">
+              No e-mail or Teams message yet.
+            </td>
+          </tr>
+        </table>
+        <mat-paginator
+          [length]="deliveries.value()?.totalElements ?? 0"
+          [pageIndex]="deliveryPage().index"
+          [pageSize]="deliveryPage().size"
+          [pageSizeOptions]="[20, 50, 100]"
+          (page)="onDeliveryPage($event)"
+        />
+      </div>
+    </mat-tab>
+  }
+</mat-tab-group>

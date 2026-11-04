@@ -94,6 +94,19 @@ export const routes: Routes = [
         title: 'Analytics · FactoryMind AI',
         loadComponent: () => import('./features/analytics/analytics').then((m) => m.Analytics),
       },
+      {
+        path: 'notifications',
+        title: 'Notifications · FactoryMind AI',
+        loadComponent: () =>
+          import('./features/notifications/notification-center').then((m) => m.NotificationCenter),
+      },
+      {
+        path: 'notifications/rules',
+        title: 'Routing rules · FactoryMind AI',
+        canActivate: [roleGuard('ADMIN', 'ENGINEER')],
+        loadComponent: () =>
+          import('./features/notifications/routing-rules').then((m) => m.RoutingRules),
+      },
       { path: '**', redirectTo: 'dashboard' },
     ],
   },

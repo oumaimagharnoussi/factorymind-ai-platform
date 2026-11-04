@@ -2,10 +2,10 @@ name: observability-ci
 
 on:
   push:
-    paths: ["infrastructure/prometheus/**", "infrastructure/grafana/**", "infrastructure/tempo/**",
+    paths: ["infrastructure/prometheus/**", "infrastructure/alertmanager/**", "infrastructure/grafana/**", "infrastructure/tempo/**",
             "docker-compose*.yml", ".github/workflows/observability-ci.yml"]
   pull_request:
-    paths: ["infrastructure/prometheus/**", "infrastructure/grafana/**", "infrastructure/tempo/**",
+    paths: ["infrastructure/prometheus/**", "infrastructure/alertmanager/**", "infrastructure/grafana/**", "infrastructure/tempo/**",
             "docker-compose*.yml", ".github/workflows/observability-ci.yml"]
 
 jobs:
@@ -18,6 +18,12 @@ jobs:
           docker run --rm --entrypoint promtool \
             -v "$PWD/infrastructure/prometheus:/etc/prometheus:ro" \
             prom/prometheus:v3.15.1 check config /etc/prometheus/prometheus.yml
+      - name: Alertmanager configuration (amtool)
+        run: |
+          echo "ci-token" > /tmp/webhook-token
+          docker run --rm --entrypoint amtool \
+            -v "$PWD/infrastructure/alertmanager:/etc/alertmanager:ro" -v /tmp/webhook-token:/tmp/webhook-token:ro \
+            prom/alertmanager:v0.34.1 check-config /etc/alertmanager/alertmanager.yml
       - name: Grafana dashboards are valid JSON with unique uids
         run: |
           python3 - <<'PY'

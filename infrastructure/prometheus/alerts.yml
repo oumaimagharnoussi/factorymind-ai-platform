@@ -1,5 +1,6 @@
 # Alert rules, evaluated by Prometheus every 15 s. See them firing at http://localhost:9090/alerts
-# (and in Grafana > Alerting). Routing them to e-mail or Teams would need an Alertmanager (not in the demo).
+# (and in Grafana > Alerting). Firing alerts go to Alertmanager (http://localhost:9093), then to
+# notification-service, whose routing rules send them by e-mail, Teams or to the app (ADR 0009).
 groups:
   - name: platform
     rules:
@@ -131,3 +132,34 @@ groups:
           severity: warning
         annotations:
           summary: "ai-insights-service gets errors from the prediction model"
+
+  - name: notifications
+    rules:
+      - alert: NotificationDeliveriesFailing
+        # Messages that failed every retry: a wrong address, a deleted Teams webhook, the mail server down.
+        expr: factorymind_notifications_deliveries_failed > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} notification(s) could not be delivered"
+          description: "See Notifications > Delivery log in the app, fix the rule or the mail server, then retry."
+
+      - alert: NotificationBacklog
+        expr: factorymind_notifications_deliveries_pending > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} notifications waiting to be sent"
+
+      # If notification-service itself is down, this alert cannot reach anyone through it: it stays visible
+      # in Prometheus, Alertmanager and Grafana (and ServiceDown fires for notification-service).
+      - alert: AlertmanagerCannotNotify
+        expr: sum(rate(alertmanager_notifications_failed_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          service: alertmanager
+        annotations:
+          summary: "Alertmanager cannot hand alerts to notification-service"

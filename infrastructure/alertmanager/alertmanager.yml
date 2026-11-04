@@ -1,0 +1,30 @@
+# Alertmanager groups the alerts Prometheus fires (infrastructure/prometheus/alerts.yml) and sends them to
+# notification-service, which applies the same routing rules as plant events: e-mail, Teams, the app's bell.
+# Who receives what is decided there (Notifications > Routing rules), not here. See docs/adr/0009.
+# UI: http://localhost:9093
+route:
+  receiver: factorymind
+  # One message per alert name and service, not one per instance.
+  group_by: [alertname, service]
+  group_wait: 30s
+  group_interval: 5m
+  # notification-service ignores a repeat of an alert it already handled (same fingerprint and start).
+  repeat_interval: 4h
+
+receivers:
+  - name: factorymind
+    webhook_configs:
+      - url: http://notification-service:8089/api/notifications/alertmanager
+        send_resolved: true
+        # Shared secret (ALERTMANAGER_WEBHOOK_TOKEN), written to this file when the container starts.
+        http_config:
+          authorization:
+            type: Bearer
+            credentials_file: /tmp/webhook-token
+        max_alerts: 50
+
+# A critical alert on a service hides the warnings of the same service (they are usually consequences).
+inhibit_rules:
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity=~"warning|info"]
+    equal: [service]

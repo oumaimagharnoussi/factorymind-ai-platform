@@ -25,6 +25,7 @@
         <module>inventory-service</module>
         <module>ai-insights-service</module>
         <module>analytics-service</module>
+        <module>notification-service</module>
         <module>api-gateway</module>
     </modules>
 

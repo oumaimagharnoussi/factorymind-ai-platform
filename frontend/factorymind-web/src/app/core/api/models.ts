@@ -621,3 +621,76 @@ export interface AnalyticsStatus {
   factories: string[];
   powerBiReportUrl: string | null;
 }
+
+// Notifications (notification-service, phase 9)
+
+export type NotificationSource = 'ALERT' | 'WORK_ORDER' | 'AI_RISK' | 'PLATFORM';
+export type NotificationSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+export type NotificationChannel = 'EMAIL' | 'TEAMS' | 'IN_APP';
+export type DeliveryStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SUPPRESSED';
+
+export interface AppNotification {
+  id: string;
+  source: NotificationSource;
+  severity: NotificationSeverity;
+  assetId: string | null;
+  assetLabel: string | null;
+  title: string;
+  message: string;
+  /** A path of this app ("/alerts") or a full URL (Prometheus). */
+  link: string | null;
+  occurredAt: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface RoutingRule {
+  id: string;
+  name: string;
+  /** null = every source */
+  source: NotificationSource | null;
+  minSeverity: NotificationSeverity;
+  channel: NotificationChannel;
+  recipient: string;
+  throttleMinutes: number;
+  enabled: boolean;
+  version: number;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export interface RoutingRuleRequest {
+  name: string;
+  source: NotificationSource | null;
+  minSeverity: NotificationSeverity;
+  channel: NotificationChannel;
+  recipient: string;
+  throttleMinutes: number;
+  enabled: boolean;
+  version?: number;
+}
+
+export interface Delivery {
+  id: string;
+  notificationId: string;
+  title: string;
+  source: NotificationSource;
+  severity: NotificationSeverity;
+  ruleId: string | null;
+  ruleName: string;
+  channel: Exclude<NotificationChannel, 'IN_APP'>;
+  recipient: string;
+  status: DeliveryStatus;
+  attempts: number;
+  nextAttemptAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+export interface RuleTestResult {
+  channel: NotificationChannel;
+  recipient: string;
+  sent: boolean;
+  detail: string;
+}

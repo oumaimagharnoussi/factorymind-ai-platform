@@ -7,6 +7,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../auth/auth';
+import { NotificationBell } from './notification-bell';
 
 interface NavItem {
   path: string;
@@ -28,6 +29,7 @@ interface NavItem {
     MatIconModule,
     MatButtonModule,
     MatMenuModule,
+    NotificationBell,
   ],
   templateUrl: './shell.html',
   styleUrl: './shell.scss',
@@ -46,5 +48,6 @@ export class Shell {
     { path: '/ai-insights', label: 'AI risk center', icon: 'insights' },
     { path: '/copilot', label: 'Maintenance copilot', icon: 'smart_toy' },
     { path: '/analytics', label: 'Analytics', icon: 'bar_chart' },
+    { path: '/notifications', label: 'Notifications', icon: 'campaign' },
   ];
 }

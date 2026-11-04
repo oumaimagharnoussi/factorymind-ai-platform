@@ -51,6 +51,11 @@ class GatewayRoutesTest {
         assertThat(uriOf("analytics-service")).isEqualTo("http://localhost:8088");
     }
 
+    @Test
+    void notificationsRouteGoesToTheNotificationService() {
+        assertThat(uriOf("notification-service")).isEqualTo("http://localhost:8089");
+    }
+
     private String uriOf(String routeId) {
         Route route = routes.getRoutes().filter(r -> r.getId().equals(routeId)).blockFirst();
         assertThat(route).as("route %s", routeId).isNotNull();

@@ -15,7 +15,9 @@ a Python ML service and Power BI analytics.
 
 ![Work order](docs/demo/work-order.png)
 
-## What works today (phases 1–8)
+![Notifications](docs/demo/notifications.png)
+
+## What works today (phases 1–9)
 
 | Area | Status |
 |---|---|
@@ -42,8 +44,10 @@ a Python ML service and Power BI analytics.
 | Power BI model and reports (Executive, Reliability & Maintenance, AI Performance) on the warehouse | ✅ |
 | Metrics for every service in Prometheus: traffic, errors, latency, JVM, database pools, Kafka lag, plus plant metrics (readings, alerts, work orders by origin, failure risk, stock, warehouse loads) | ✅ |
 | Distributed tracing (OpenTelemetry, Grafana Tempo) across HTTP calls and Kafka, trace ids in every log line | ✅ |
-| Grafana dashboards (Plant operations, Services) and 14 Prometheus alert rules, provisioned as code | ✅ |
-| Alert routing (e-mail, Teams), central logs (Loki), contract tests | Later |
+| Grafana dashboards (Plant operations, Services) and 17 Prometheus alert rules, provisioned as code | ✅ |
+| Notification service: sensor alerts, work orders, AI failure risk and Prometheus alerts (through Alertmanager) routed by editable rules to e-mail, Microsoft Teams and an in-app bell, with throttling, retries and a delivery log | ✅ |
+| Service-to-service call with OAuth2 client credentials (notification-service reads machine names from asset-service) | ✅ |
+| Central logs (Loki), contract tests | Later |
 
 ## Architecture
 
@@ -62,8 +66,12 @@ API Gateway (8080) ─┬─► asset-service (8081) ──────► Postg
                     │        │ REST /predict           │ Spring AI (optional)
                     │        ▼                         ▼
                     │  ml-service (8090, Python)   Claude API or Ollama (chat), Ollama (embeddings)
-                    └─► analytics-service (8088) ──► PostgreSQL analytics_db (star schema) ◄── Power BI
-                             reads every service database above (read-only), every 5 min
+                    ├─► analytics-service (8088) ──► PostgreSQL analytics_db (star schema) ◄── Power BI
+                    │        reads every service database above (read-only), every 5 min
+                    └─► notification-service (8089) ► PostgreSQL notification_db (rules, outbox)
+                             │ e-mail (SMTP: Mailpit in dev)   │ Teams webhook   │ in-app bell (SSE)
+                             ▲ Alertmanager (9093) ◄── Prometheus alert rules
+                             ▲ client-credentials token from Keycloak ──► asset-service (machine names)
 
 Kafka (9092)
   asset.sensor-definitions   asset ──► telemetry
@@ -73,6 +81,7 @@ Kafka (9092)
   maintenance.work-orders    maintenance ──► alert (acknowledge, resolve when completed), ai-insights
   ai.risk-levels             ai-insights ──► maintenance (HIGH risk plans an inspection)
   (ai-insights also reads sensor-definitions, readings and alerts)
+  (notification-service reads alerts, work-orders and risk-levels)
 ```
 
 Each service owns its database; services talk over REST for queries and Kafka for events.
@@ -99,6 +108,12 @@ Every service exposes its metrics to Prometheus and sends its traces to Tempo; G
 follows a reading from the simulator through Kafka to the alert, the work order and back, and a dot on a latency
 graph opens the trace of that request. See [ADR 0008](docs/adr/0008-observability.md) and
 [Observability](#observability) below.
+notification-service turns the events people must hear about (a raised or escalated alert, a new or completed
+work order, a machine turning HIGH risk, a Prometheus alert from Alertmanager) into notifications. Routing rules
+that admins edit in the app decide who gets what: e-mail, a Teams channel, or the bell of a role. Each event is
+stored once (its key makes Kafka redeliveries harmless), e-mails and Teams messages go through an outbox that is
+retried with exponential backoff, and a throttle window keeps one flapping sensor from sending twenty e-mails.
+See [ADR 0009](docs/adr/0009-notifications-alert-routing.md).
 Decisions are recorded in [`docs/adr`](docs/adr).
 
 ## Observability
@@ -109,7 +124,8 @@ Decisions are recorded in [`docs/adr`](docs/adr).
 | Grafana > FactoryMind > **Services** | Up/down, requests, 4xx/5xx, p95 latency per service and slowest endpoints, calls between services, language model latency and tokens, Kafka throughput and lag, heap, CPU, GC, DB connections |
 | Grafana > Explore > Tempo > **Service graph** | Who calls whom (gateway, services, Kafka), with rate, errors and latency, drawn from the traces |
 | Grafana > Explore > Tempo > Search | One request across services: e.g. `service.name = maintenance-service`, then open a trace |
-| http://localhost:9090/alerts | The 14 alert rules (`infrastructure/prometheus/alerts.yml`) and which ones fire |
+| http://localhost:9090/alerts | The 17 alert rules (`infrastructure/prometheus/alerts.yml`) and which ones fire |
+| http://localhost:9093 | Alertmanager: firing alerts, grouped, sent to notification-service (then e-mail / Teams / app per the rules) |
 
 Every Spring Boot service serves `/actuator/prometheus` (open on the Docker network only; nginx and Caddy never
 forward `/actuator`), the Python model serves `/metrics`. Log lines carry `[traceId-spanId]`, so
@@ -138,6 +154,7 @@ Every role can watch live and historical readings; pushing readings over HTTP ne
 | Spare parts | Read | + create / edit parts, receive deliveries | + stock counts, delete parts |
 | AI | Read risks, ask the copilot | + machine reports, add / remove copilot documents | Same as engineer |
 | Analytics | Read KPIs | Same as operator | + start a warehouse load |
+| Notifications | Own feed (bell) | + routing rules and delivery log (read) | + edit rules, send tests, retry deliveries |
 
 Demo accounts (realm import in `infrastructure/keycloak/factorymind-realm.json`; change them before any real use):
 
@@ -146,6 +163,11 @@ Demo accounts (realm import in `infrastructure/keycloak/factorymind-realm.json`;
 | `admin` | `admin` | ADMIN |
 | `engineer` | `engineer` | ENGINEER |
 | `operator` | `operator` | OPERATOR |
+
+Services also have their own Keycloak client: notification-service logs in with OAuth2 client credentials
+(client `notification-service`, service account with the OPERATOR role) to read machine names from asset-service,
+because Kafka events carry no user token. Alertmanager calls the notification webhook with a shared bearer token
+(`ALERTMANAGER_WEBHOOK_TOKEN`), not a Keycloak token.
 
 Keycloak admin console: http://localhost:8180/auth/admin (`KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`, default
 `admin` / `admin`). See [ADR 0002](docs/adr/0002-keycloak-security.md).
@@ -156,7 +178,8 @@ Java 25 · Spring Boot 4.0.9 · Spring Cloud 2025.1.4 (Gateway) · Spring for Ap
 Spring Data JPA · Flyway · PostgreSQL 17 + pgvector · Server-Sent Events ·
 Spring AI 2.0.1 (Anthropic Claude, Ollama, tool calling, embeddings, PDF reader) · RAG with hybrid search ·
 Python 3.13 · scikit-learn 1.9 · FastAPI · pytest · Star-schema warehouse (Postgres) · Power BI (DAX, TMDL) ·
-Micrometer · Prometheus · OpenTelemetry · Grafana Tempo · Grafana (dashboards and alert rules as code) ·
+Micrometer · Prometheus · Alertmanager · OpenTelemetry · Grafana Tempo · Grafana (dashboards and alert rules as code) ·
+Spring Mail (Mailpit in dev) · Microsoft Teams Adaptive Cards · OAuth2 client credentials · Transactional outbox ·
 Angular 22 (standalone components, signals, `rxResource`, reactive forms, Angular Material) · Vitest ·
 JUnit 5 · Mockito · Testcontainers · Docker Compose · GitHub Actions.
 
@@ -196,13 +219,18 @@ writing an answer; risk scoring never needs a language model. To let the copilot
 | http://localhost:8086/swagger-ui.html | inventory-service API |
 | http://localhost:8087/swagger-ui.html | ai-insights-service API |
 | http://localhost:8088/swagger-ui.html | analytics-service API |
+| http://localhost:8089/swagger-ui.html | notification-service API |
+| http://localhost:8025 | Mailpit: every e-mail the platform sends (nothing leaves your machine) |
 | http://localhost:8090/docs | Python model API (internal; open in dev only) |
 | `localhost:5432`, database `analytics_db` | Power BI: see [the Power BI guide](docs/analytics/power-bi-guide.md) |
 | http://localhost:3000 | Grafana: dashboards and traces (open without login; `admin` / `GRAFANA_ADMIN_PASSWORD` to edit) |
 | http://localhost:9090 | Prometheus: metrics, targets (`/targets`), alert rules (`/alerts`) |
+| http://localhost:9093 | Alertmanager: Prometheus alerts on their way to notification-service |
 
 Already ran an earlier phase? `docker compose up --build` is enough: the `db-init` container creates
-the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`, `insights_db`, `analytics_db`) in the existing Postgres volume.
+the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`, `insights_db`, `analytics_db`,
+`notification_db`) in the existing Postgres volume. Coming from before phase 9, recreate the Keycloak container once
+(`docker compose up -d --force-recreate keycloak`) so it imports the new `notification-service` client.
 Coming from before phase 6, recreate the Postgres volume once (`docker compose down -v`): Postgres now runs on the
 Debian-based `pgvector/pgvector` image, whose text sorting differs from the old Alpine one. The demo data comes back
 on start.
@@ -210,8 +238,8 @@ on start.
 ### For development
 
 ```bash
-docker compose up -d postgres db-init kafka kafka-ui keycloak
-docker compose up -d prometheus tempo grafana   # optional: dashboards and traces
+docker compose up -d postgres db-init kafka kafka-ui keycloak mailpit
+docker compose up -d prometheus alertmanager tempo grafana   # optional: dashboards, traces, alert routing
 
 # Backend (JDK 25; with JDK 21 add -Djava.version=21), one terminal each
 cd backend
@@ -222,6 +250,7 @@ SIMULATOR_ENABLED=true ./mvnw -pl telemetry-service spring-boot:run
 ./mvnw -pl maintenance-service spring-boot:run
 ./mvnw -pl ai-insights-service spring-boot:run
 ./mvnw -pl analytics-service spring-boot:run
+./mvnw -pl notification-service spring-boot:run
 ./mvnw -pl api-gateway spring-boot:run
 
 # Python model (Python 3.13)
@@ -347,13 +376,28 @@ Errors use RFC 9457 problem details, for example:
 | GET | `/api/analytics/status` | Last loads, first day with data, simulated history, factories, Power BI link |
 | POST | `/api/analytics/refresh` | Load the warehouse now (ADMIN) |
 
+## API (notification-service, through the gateway)
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/api/notifications?unreadOnly=&page=&size=` | The caller's feed (notifications routed to one of their roles), with read state |
+| GET | `/api/notifications/unread-count` | The bell's number |
+| GET | `/api/notifications/stream` | New notifications for the caller's roles (Server-Sent Events, event `notification`) |
+| POST | `/api/notifications/{id}/read`, `/api/notifications/read-all` | Mark as read (per user) |
+| GET | `/api/notifications/rules` | Routing rules (ENGINEER/ADMIN; Teams webhook URLs in full for ADMIN only) |
+| POST, PUT, DELETE | `/api/notifications/rules`, `/{id}` | Create, change, delete a rule (ADMIN) |
+| POST | `/api/notifications/rules/{id}/test` | Send a test message through a rule now (ADMIN) |
+| GET | `/api/notifications/deliveries?status=&channel=` | Delivery log: sent, pending retry, failed, throttled (ENGINEER/ADMIN) |
+| POST | `/api/notifications/deliveries/{id}/retry` | Send a failed or throttled message again (ADMIN) |
+| POST | `/api/notifications/alertmanager` | Alertmanager webhook (shared token; called inside the Docker network, not through the gateway) |
+
 ## Repository layout
 
 ```
-backend/          Maven multi-module: asset, telemetry, alert, maintenance, inventory, ai-insights, analytics services and api-gateway
+backend/          Maven multi-module: asset, telemetry, alert, maintenance, inventory, ai-insights, analytics, notification services and api-gateway
 frontend/         Angular app (factorymind-web)
 ml/               Python failure-risk model: features, simulated training data, training, FastAPI service
 analytics/        Power BI measures and project, warehouse overview (pipeline: backend/analytics-service)
-infrastructure/   Database init script, Keycloak realm, Caddy, Prometheus (scrape + alert rules), Tempo, Grafana (data sources, dashboards)
+infrastructure/   Database init script, Keycloak realm, Caddy, Prometheus (scrape + alert rules), Alertmanager, Tempo, Grafana (data sources, dashboards)
 docs/             ADRs, architecture notes, screenshots
 ```

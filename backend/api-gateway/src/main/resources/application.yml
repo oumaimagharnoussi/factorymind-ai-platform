@@ -55,6 +55,12 @@ spring:
               uri: ${ANALYTICS_SERVICE_URL:http://localhost:8088}
               predicates:
                 - Path=/api/analytics/**
+            # Includes /api/notifications/stream (Server-Sent Events). Alertmanager calls the webhook directly
+            # inside the Docker network; through the gateway it would also need a user token, so it cannot.
+            - id: notification-service
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8089}
+              predicates:
+                - Path=/api/notifications/**
 
 management:
   endpoints:

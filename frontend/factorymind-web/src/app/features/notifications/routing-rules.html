@@ -1,0 +1,198 @@
+<header class="page-header">
+  <div>
+    <h1>Routing rules</h1>
+    <p class="subtitle">
+      Each rule sends the events of one source (or all), at or above a severity, over one channel. A
+      throttle sends at most one message per window about the same machine, so a flapping sensor
+      does not flood a mailbox.
+    </p>
+  </div>
+  <div class="buttons">
+    <a mat-button routerLink="/notifications">
+      <mat-icon>arrow_back</mat-icon>
+      Notifications
+    </a>
+    @if (isAdmin) {
+      <button mat-flat-button (click)="create()">
+        <mat-icon>add</mat-icon>
+        New rule
+      </button>
+    }
+  </div>
+</header>
+
+@if (testResult(); as result) {
+  <div class="test-result" [class.failed]="!result.sent">
+    <mat-icon>{{ result.sent ? 'check_circle' : 'error' }}</mat-icon>
+    <span>
+      Test of "{{ result.rule }}" ({{ channelLabels[result.channel] }}, {{ result.recipient }}):
+      {{ result.detail }}
+    </span>
+    <button mat-icon-button (click)="testResult.set(null)" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+}
+
+@if (editing(); as form) {
+  <mat-card class="rule-form">
+    <mat-card-header>
+      <mat-card-title>{{ form.id ? 'Edit rule' : 'New rule' }}</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="grid">
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Name</mat-label>
+          <input matInput maxlength="120" required [(ngModel)]="form.draft.name" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Source</mat-label>
+          <mat-select [(ngModel)]="form.draft.source">
+            <mat-option [value]="null">Every source</mat-option>
+            @for (s of sources; track s) {
+              <mat-option [value]="s">{{ sourceLabels[s] }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>At least</mat-label>
+          <mat-select [(ngModel)]="form.draft.minSeverity">
+            @for (s of severities; track s) {
+              <mat-option [value]="s">{{ s }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Channel</mat-label>
+          <mat-select
+            [(ngModel)]="form.draft.channel"
+            (selectionChange)="channelChanged(form.draft)"
+          >
+            @for (c of channels; track c) {
+              <mat-option [value]="c">{{ channelLabels[c] }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Throttle (minutes, 0 = none)</mat-label>
+          <input
+            matInput
+            type="number"
+            min="0"
+            max="1440"
+            [(ngModel)]="form.draft.throttleMinutes"
+          />
+        </mat-form-field>
+        @if (form.draft.channel === 'IN_APP') {
+          <mat-form-field appearance="outline" class="wide">
+            <mat-label>Role</mat-label>
+            <mat-select [(ngModel)]="form.draft.recipient">
+              @for (r of roles; track r) {
+                <mat-option [value]="r">{{ r }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>{{ recipientHints[form.draft.channel] }}</mat-hint>
+          </mat-form-field>
+        } @else {
+          <mat-form-field appearance="outline" class="wide">
+            <mat-label>{{
+              form.draft.channel === 'EMAIL' ? 'E-mail addresses' : 'Teams webhook URL'
+            }}</mat-label>
+            <input matInput maxlength="1000" required [(ngModel)]="form.draft.recipient" />
+            <mat-hint>{{ recipientHints[form.draft.channel] }}</mat-hint>
+          </mat-form-field>
+        }
+      </div>
+      <mat-slide-toggle [(ngModel)]="form.draft.enabled">Enabled</mat-slide-toggle>
+      @if (error()) {
+        <p class="error-banner">{{ error() }}</p>
+      }
+      <div class="buttons">
+        <button
+          mat-flat-button
+          [disabled]="saving() || !form.draft.name.trim() || !form.draft.recipient.trim()"
+          (click)="save()"
+        >
+          Save
+        </button>
+        <button mat-button (click)="editing.set(null)">Cancel</button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+}
+
+<div class="table-card">
+  @if (rules.isLoading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+  <table mat-table [dataSource]="rules.value() ?? []">
+    <ng-container matColumnDef="enabled">
+      <th mat-header-cell *matHeaderCellDef>On</th>
+      <td mat-cell *matCellDef="let r">
+        <mat-slide-toggle
+          [checked]="r.enabled"
+          [disabled]="!isAdmin"
+          (change)="toggle(r)"
+          [attr.aria-label]="'Enable ' + r.name"
+        />
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>Rule</th>
+      <td mat-cell *matCellDef="let r">
+        <strong>{{ r.name }}</strong>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="when">
+      <th mat-header-cell *matHeaderCellDef>When</th>
+      <td mat-cell *matCellDef="let r">
+        {{ r.source ? sourceLabels[r.source] : 'Every source' }}, at least
+        <app-status-chip [value]="r.minSeverity" />
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="channel">
+      <th mat-header-cell *matHeaderCellDef>Sent to</th>
+      <td mat-cell *matCellDef="let r">
+        <span class="channel">
+          <mat-icon>{{ channelIcons[r.channel] }}</mat-icon>
+          {{ r.channel === 'IN_APP' ? 'Bell of every ' + r.recipient : r.recipient }}
+        </span>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="throttle">
+      <th mat-header-cell *matHeaderCellDef>Throttle</th>
+      <td mat-cell *matCellDef="let r">
+        {{ r.throttleMinutes ? r.throttleMinutes + ' min' : '—' }}
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="updated">
+      <th mat-header-cell *matHeaderCellDef>Changed</th>
+      <td mat-cell *matCellDef="let r" class="secondary">
+        {{ r.updatedAt | date: 'MMM d, HH:mm' }} by {{ r.updatedBy ?? 'system' }}
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let r">
+        @if (isAdmin) {
+          <button
+            mat-icon-button
+            matTooltip="Send a test message"
+            (click)="test(r)"
+            aria-label="Test"
+          >
+            <mat-icon>send</mat-icon>
+          </button>
+          <button mat-icon-button matTooltip="Edit" (click)="edit(r)" aria-label="Edit">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-icon-button matTooltip="Delete" (click)="remove(r)" aria-label="Delete">
+            <mat-icon>delete</mat-icon>
+          </button>
+        }
+      </td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="columns"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns" [class.disabled-rule]="!row.enabled"></tr>
+  </table>
+</div>
