@@ -17,7 +17,9 @@ a Python ML service and Power BI analytics.
 
 ![Notifications](docs/demo/notifications.png)
 
-## What works today (phases 1–9)
+![Logs in Grafana Loki](docs/demo/logs.png)
+
+## What works today (phases 1–10)
 
 | Area | Status |
 |---|---|
@@ -47,7 +49,8 @@ a Python ML service and Power BI analytics.
 | Grafana dashboards (Plant operations, Services) and 17 Prometheus alert rules, provisioned as code | ✅ |
 | Notification service: sensor alerts, work orders, AI failure risk and Prometheus alerts (through Alertmanager) routed by editable rules to e-mail, Microsoft Teams and an in-app bell, with throttling, retries and a delivery log | ✅ |
 | Service-to-service call with OAuth2 client credentials (notification-service reads machine names from asset-service) | ✅ |
-| Central logs (Loki), contract tests | Later |
+| Central logs: every container's output in Grafana Loki (collected by Grafana Alloy), JSON lines with trace ids, log ↔ trace links, a Logs dashboard and alert rules on the logs (error bursts, dead-lettered Kafka messages) | ✅ |
+| Contract tests | Later |
 
 ## Architecture
 
@@ -72,6 +75,9 @@ API Gateway (8080) ─┬─► asset-service (8081) ──────► Postg
                              │ e-mail (SMTP: Mailpit in dev)   │ Teams webhook   │ in-app bell (SSE)
                              ▲ Alertmanager (9093) ◄── Prometheus alert rules
                              ▲ client-credentials token from Keycloak ──► asset-service (machine names)
+
+Every container's stdout ──► Alloy (Docker socket) ──► Loki (3100) ──► Grafana (3000) ◄── Prometheus, Tempo
+                                                        └─ log alert rules ──► Alertmanager ──► notification-service
 
 Kafka (9092)
   asset.sensor-definitions   asset ──► telemetry
@@ -108,6 +114,9 @@ Every service exposes its metrics to Prometheus and sends its traces to Tempo; G
 follows a reading from the simulator through Kafka to the alert, the work order and back, and a dot on a latency
 graph opens the trace of that request. See [ADR 0008](docs/adr/0008-observability.md) and
 [Observability](#observability) below.
+Every container writes its logs to stdout as usual; Alloy reads them through the Docker socket and stores them in
+Loki with the service, the level and the trace id, so Grafana searches the logs of the whole platform and jumps
+from a log line to its trace and back. See [ADR 0010](docs/adr/0010-centralized-logs.md).
 notification-service turns the events people must hear about (a raised or escalated alert, a new or completed
 work order, a machine turning HIGH risk, a Prometheus alert from Alertmanager) into notifications. Routing rules
 that admins edit in the app decide who gets what: e-mail, a Teams channel, or the bell of a role. Each event is
@@ -126,10 +135,18 @@ Decisions are recorded in [`docs/adr`](docs/adr).
 | Grafana > Explore > Tempo > Search | One request across services: e.g. `service.name = maintenance-service`, then open a trace |
 | http://localhost:9090/alerts | The 17 alert rules (`infrastructure/prometheus/alerts.yml`) and which ones fire |
 | http://localhost:9093 | Alertmanager: firing alerts, grouped, sent to notification-service (then e-mail / Teams / app per the rules) |
+| Grafana > FactoryMind > **Logs** | Log volume per service, errors and warnings, top error sources, search by service / level / text, errors that happened inside a traced request |
+| Grafana > Explore > **Loki** (sign in as admin) | Any LogQL query, e.g. `{service="maintenance-service", level="ERROR"}` or `{service=~".+"} \| trace_id="<id>"`; open a line, **View trace** opens it in Tempo |
+| Grafana > Explore > Tempo > a span > **Logs for this span** | The log lines of that service with that trace id |
+| http://localhost:12345 | Alloy: the log pipeline and the containers it reads |
 
 Every Spring Boot service serves `/actuator/prometheus` (open on the Docker network only; nginx and Caddy never
-forward `/actuator`), the Python model serves `/metrics`. Log lines carry `[traceId-spanId]`, so
-`docker compose logs | findstr <traceId>` (Windows) or `grep` shows one request in every service.
+forward `/actuator`), the Python model serves `/metrics`. In Docker every service logs one JSON object per line
+(`LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash`, with `traceId` and `spanId`); started from the IDE it keeps the
+readable text format with `[traceId-spanId]`. Alloy ships every container's output to Loki (7 days kept), and two
+Loki rules (`infrastructure/loki/rules`) raise alerts through Alertmanager: `ErrorLogBurst` (more than 20 errors in
+5 minutes from one service) and `KafkaMessagesDeadLettered` (a consumer gave up on a message and sent it to its
+`-dlt` topic).
 Started from the IDE, a service exports traces only if `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`
 is set (for example `http://localhost:4318/v1/traces` with the `tempo` container running).
 
@@ -178,7 +195,7 @@ Java 25 · Spring Boot 4.0.9 · Spring Cloud 2025.1.4 (Gateway) · Spring for Ap
 Spring Data JPA · Flyway · PostgreSQL 17 + pgvector · Server-Sent Events ·
 Spring AI 2.0.1 (Anthropic Claude, Ollama, tool calling, embeddings, PDF reader) · RAG with hybrid search ·
 Python 3.13 · scikit-learn 1.9 · FastAPI · pytest · Star-schema warehouse (Postgres) · Power BI (DAX, TMDL) ·
-Micrometer · Prometheus · Alertmanager · OpenTelemetry · Grafana Tempo · Grafana (dashboards and alert rules as code) ·
+Micrometer · Prometheus · Alertmanager · OpenTelemetry · Grafana Tempo · Grafana Loki · Grafana Alloy · Spring Boot structured logging · Grafana (dashboards and alert rules as code) ·
 Spring Mail (Mailpit in dev) · Microsoft Teams Adaptive Cards · OAuth2 client credentials · Transactional outbox ·
 Angular 22 (standalone components, signals, `rxResource`, reactive forms, Angular Material) · Vitest ·
 JUnit 5 · Mockito · Testcontainers · Docker Compose · GitHub Actions.
@@ -223,9 +240,11 @@ writing an answer; risk scoring never needs a language model. To let the copilot
 | http://localhost:8025 | Mailpit: every e-mail the platform sends (nothing leaves your machine) |
 | http://localhost:8090/docs | Python model API (internal; open in dev only) |
 | `localhost:5432`, database `analytics_db` | Power BI: see [the Power BI guide](docs/analytics/power-bi-guide.md) |
-| http://localhost:3000 | Grafana: dashboards and traces (open without login; `admin` / `GRAFANA_ADMIN_PASSWORD` to edit) |
+| http://localhost:3000 | Grafana: dashboards, traces and logs (open without login; `admin` / `GRAFANA_ADMIN_PASSWORD` to edit and to use Explore) |
 | http://localhost:9090 | Prometheus: metrics, targets (`/targets`), alert rules (`/alerts`) |
 | http://localhost:9093 | Alertmanager: Prometheus alerts on their way to notification-service |
+| http://localhost:3100/ready | Loki (logs; read them in Grafana) |
+| http://localhost:12345 | Alloy: log collection pipeline |
 
 Already ran an earlier phase? `docker compose up --build` is enough: the `db-init` container creates
 the missing databases (`telemetry_db`, `alert_db`, `maintenance_db`, `inventory_db`, `insights_db`, `analytics_db`,
@@ -239,7 +258,7 @@ on start.
 
 ```bash
 docker compose up -d postgres db-init kafka kafka-ui keycloak mailpit
-docker compose up -d prometheus alertmanager tempo grafana   # optional: dashboards, traces, alert routing
+docker compose up -d prometheus alertmanager tempo loki alloy grafana   # optional: dashboards, traces, logs, alert routing
 
 # Backend (JDK 25; with JDK 21 add -Djava.version=21), one terminal each
 cd backend
@@ -398,6 +417,6 @@ backend/          Maven multi-module: asset, telemetry, alert, maintenance, inve
 frontend/         Angular app (factorymind-web)
 ml/               Python failure-risk model: features, simulated training data, training, FastAPI service
 analytics/        Power BI measures and project, warehouse overview (pipeline: backend/analytics-service)
-infrastructure/   Database init script, Keycloak realm, Caddy, Prometheus (scrape + alert rules), Alertmanager, Tempo, Grafana (data sources, dashboards)
+infrastructure/   Database init script, Keycloak realm, Caddy, Prometheus (scrape + alert rules), Alertmanager, Tempo, Loki (+ log alert rules), Alloy, Grafana (data sources, dashboards)
 docs/             ADRs, architecture notes, screenshots
 ```

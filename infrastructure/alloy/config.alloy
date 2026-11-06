@@ -1,0 +1,98 @@
+// Grafana Alloy collects the logs of every container of this Compose project from the Docker socket,
+// labels them (service, level), keeps the trace id as structured metadata, and pushes them to Loki.
+// Nothing changes in the services: they keep writing to stdout. UI (pipeline graph): http://localhost:12345
+// See docs/adr/0010-centralized-logs.md.
+
+discovery.docker "containers" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "10s"
+
+	// Only this project's containers ("name: factorymind" in docker-compose.yml), not other projects.
+	filter {
+		name   = "label"
+		values = ["com.docker.compose.project=factorymind"]
+	}
+}
+
+discovery.relabel "containers" {
+	targets = discovery.docker.containers.targets
+
+	// "notification-service", the same name as in Prometheus and Tempo.
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+
+	// One-shot jobs (db-init) and the log pipeline itself are left out.
+	rule {
+		source_labels = ["service"]
+		regex         = "db-init|alloy"
+		action        = "drop"
+	}
+}
+
+loki.source.docker "containers" {
+	host             = "unix:///var/run/docker.sock"
+	targets          = discovery.relabel.containers.output
+	forward_to       = [loki.process.levels.receiver]
+	refresh_interval = "10s"
+}
+
+loki.process "levels" {
+	// Plain-text lines (Kafka, Keycloak, Postgres, a service started without JSON logs): the first level word.
+	stage.regex {
+		expression = "(?i)\\b(?P<level>trace|debug|info|warn|warning|error|fatal|severe|panic)\\b"
+	}
+
+	// JSON lines: Spring Boot's logstash format and the Python model's formatter.
+	stage.json {
+		expressions = {
+			level   = "level",
+			traceId = "traceId",
+			spanId  = "spanId",
+			logger  = "logger_name",
+		}
+	}
+
+	// One spelling per level, so {level="ERROR"} finds the errors of every service.
+	stage.template {
+		source   = "level"
+		template = "{{ $l := ToUpper .Value }}{{ if eq $l \"WARNING\" }}WARN{{ else if or (eq $l \"SEVERE\") (eq $l \"PANIC\") }}FATAL{{ else }}{{ $l }}{{ end }}"
+	}
+
+	// Few distinct values: an index label. A trace id is unique per request: structured metadata.
+	stage.labels {
+		values = {level = ""}
+	}
+
+	// Lines without a level word (a configuration dump, the rest of a multi-line message): INFO.
+	stage.match {
+		selector = "{service=~\".+\", level=\"\"}"
+
+		stage.static_labels {
+			values = {level = "INFO"}
+		}
+	}
+
+	stage.structured_metadata {
+		values = {
+			trace_id = "traceId",
+			span_id  = "spanId",
+			logger   = "logger",
+		}
+	}
+
+	forward_to = [loki.write.loki.receiver]
+}
+
+loki.write "loki" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}

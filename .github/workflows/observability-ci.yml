@@ -3,9 +3,11 @@ name: observability-ci
 on:
   push:
     paths: ["infrastructure/prometheus/**", "infrastructure/alertmanager/**", "infrastructure/grafana/**", "infrastructure/tempo/**",
+            "infrastructure/loki/**", "infrastructure/alloy/**",
             "docker-compose*.yml", ".github/workflows/observability-ci.yml"]
   pull_request:
     paths: ["infrastructure/prometheus/**", "infrastructure/alertmanager/**", "infrastructure/grafana/**", "infrastructure/tempo/**",
+            "infrastructure/loki/**", "infrastructure/alloy/**",
             "docker-compose*.yml", ".github/workflows/observability-ci.yml"]
 
 jobs:
@@ -24,6 +26,23 @@ jobs:
           docker run --rm --entrypoint amtool \
             -v "$PWD/infrastructure/alertmanager:/etc/alertmanager:ro" -v /tmp/webhook-token:/tmp/webhook-token:ro \
             prom/alertmanager:v0.34.1 check-config /etc/alertmanager/alertmanager.yml
+      - name: Loki configuration
+        run: |
+          docker run --rm -v "$PWD/infrastructure/loki:/etc/loki:ro" \
+            grafana/loki:3.7.9 -config.file=/etc/loki/loki.yml -verify-config
+      - name: Loki alert rules load (LogQL parsed by the ruler)
+        run: |
+          docker run -d --name loki -p 3100:3100 -v "$PWD/infrastructure/loki/loki.yml:/etc/loki/loki.yml:ro" \
+            -v "$PWD/infrastructure/loki/rules:/etc/loki/rules:ro" grafana/loki:3.7.9 -config.file=/etc/loki/loki.yml
+          for i in $(seq 1 60); do curl -sf localhost:3100/ready && break; sleep 2; done
+          rules=$(curl -sf localhost:3100/loki/api/v1/rules)
+          echo "$rules"
+          for alert in ErrorLogBurst KafkaMessagesDeadLettered; do echo "$rules" | grep -q "alert: $alert" || { docker logs loki; exit 1; }; done
+          ! docker logs loki 2>&1 | grep -i "level=error.*rule"
+      - name: Alloy pipeline
+        run: |
+          docker run --rm -v "$PWD/infrastructure/alloy:/etc/alloy:ro" \
+            grafana/alloy:v1.21.3 validate /etc/alloy/config.alloy
       - name: Grafana dashboards are valid JSON with unique uids
         run: |
           python3 - <<'PY'

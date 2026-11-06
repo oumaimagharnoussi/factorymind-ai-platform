@@ -1,4 +1,5 @@
-# Provisioned at start: Grafana (http://localhost:3000) opens with Prometheus and Tempo already connected.
+# Provisioned at start: Grafana (http://localhost:3000) opens with Prometheus, Tempo and Loki already connected,
+# and linked: a log line opens its trace, a span opens its logs, a latency dot opens its trace.
 apiVersion: 1
 
 datasources:
@@ -35,3 +36,30 @@ datasources:
         queries:
           - name: Request rate
             query: sum(rate(http_server_requests_seconds_count{$$__tags}[1m]))
+      # "Logs for this span": the lines of that service carrying the trace id, a few minutes around the span.
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+        filterByTraceID: true
+        filterBySpanID: false
+        tags:
+          - key: service.name
+            value: service
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+      # Alloy stores the trace id of each Spring Boot line as structured metadata "trace_id":
+      # the log details show a "View trace" button that opens it in Tempo.
+      derivedFields:
+        - name: trace_id
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: "$${__value.raw}"
+          urlDisplayLabel: View trace

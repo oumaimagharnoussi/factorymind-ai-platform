@@ -48,6 +48,18 @@ scrape_configs:
         labels:
           service: tempo
 
+  - job_name: loki
+    static_configs:
+      - targets: [loki:3100]
+        labels:
+          service: loki
+
+  - job_name: alloy
+    static_configs:
+      - targets: [alloy:12345]
+        labels:
+          service: alloy
+
   - job_name: alertmanager
     static_configs:
       - targets: [alertmanager:9093]

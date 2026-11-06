@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "json": { "()": "factorymind_ml.logs.JsonFormatter" }
+  },
+  "filters": {
+    "quiet_probes": { "()": "factorymind_ml.logs.QuietProbes" }
+  },
+  "handlers": {
+    "stdout": { "class": "logging.StreamHandler", "formatter": "json", "stream": "ext://sys.stdout" },
+    "access": {
+      "class": "logging.StreamHandler",
+      "formatter": "json",
+      "filters": ["quiet_probes"],
+      "stream": "ext://sys.stdout"
+    }
+  },
+  "loggers": {
+    "uvicorn": { "handlers": ["stdout"], "level": "INFO", "propagate": false },
+    "uvicorn.error": { "level": "INFO" },
+    "uvicorn.access": { "handlers": ["access"], "level": "INFO", "propagate": false }
+  },
+  "root": { "handlers": ["stdout"], "level": "INFO" }
+}

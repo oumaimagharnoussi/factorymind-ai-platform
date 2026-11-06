@@ -12,4 +12,5 @@ USER app
 EXPOSE 8090
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"
-CMD ["uvicorn", "factorymind_ml.api:app", "--host", "0.0.0.0", "--port", "8090"]
+# JSON log lines (factorymind_ml/logs.py), collected by Alloy and stored in Loki like the other services.
+CMD ["uvicorn", "factorymind_ml.api:app", "--host", "0.0.0.0", "--port", "8090", "--log-config", "factorymind_ml/log_config.json"]

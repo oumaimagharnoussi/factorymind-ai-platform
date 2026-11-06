@@ -6,6 +6,9 @@ name: factorymind
 x-observability: &observability
   MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://tempo:4318/v1/traces
   TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.2}
+  # One JSON object per log line (with traceId/spanId), read by Alloy and stored in Loki. Started from
+  # the IDE, a service keeps the readable text format.
+  LOGGING_STRUCTURED_FORMAT_CONSOLE: logstash
 
 services:
   postgres:
@@ -329,6 +332,31 @@ services:
       - ./infrastructure/tempo/tempo.yml:/etc/tempo.yml:ro
       - tempo-data:/var/tempo
 
+  loki:
+    image: grafana/loki:3.7.9
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    # Runs as root so it can write to the named volume on Docker Desktop.
+    user: "0"
+    volumes:
+      - ./infrastructure/loki/loki.yml:/etc/loki/loki.yml:ro
+      - ./infrastructure/loki/rules:/etc/loki/rules:ro
+      - loki-data:/loki
+    depends_on:
+      - alertmanager
+
+  # Reads every container's stdout through the Docker socket and ships it to Loki (no change in the services).
+  alloy:
+    image: grafana/alloy:v1.21.3
+    restart: unless-stopped
+    command: ["run", "--server.http.listen-addr=0.0.0.0:12345", "--storage.path=/var/lib/alloy/data", "/etc/alloy/config.alloy"]
+    volumes:
+      - ./infrastructure/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data   # read positions: no line sent twice after a restart
+    depends_on:
+      - loki
+
   grafana:
     image: grafana/grafana:13.2.5
     restart: unless-stopped
@@ -340,6 +368,9 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/plant-operations.json
       GF_ANALYTICS_REPORTING_ENABLED: "false"
+      # No calls to grafana.com for updates (and no error lines in Loki when offline).
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
     volumes:
       - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -347,6 +378,7 @@ services:
     depends_on:
       - prometheus
       - tempo
+      - loki
 
   caddy:
     image: caddy:2-alpine
@@ -372,3 +404,5 @@ volumes:
   tempo-data:
   grafana-data:
   alertmanager-data:
+  loki-data:
+  alloy-data:

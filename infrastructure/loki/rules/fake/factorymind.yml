@@ -1,0 +1,27 @@
+# Alert rules on the logs, evaluated by Loki every minute (LogQL). Firing alerts go to Alertmanager
+# (http://localhost:9093) and notification-service, exactly like the Prometheus rules. "fake" is the
+# name of Loki's single tenant. Labels: service (compose service), level (normalised by Alloy).
+groups:
+  - name: logs
+    rules:
+      - alert: ErrorLogBurst
+        expr: |
+          sum by (service) (count_over_time({level="ERROR"}[5m])) > 20
+        for: 2m
+        labels:
+          severity: warning
+          source: logs
+        annotations:
+          summary: "{{ $labels.service }} logged {{ $value }} errors in 5 minutes"
+          description: "Open Grafana > Explore > Loki with {service=\"{{ $labels.service }}\", level=\"ERROR\"} to read them."
+
+      - alert: KafkaMessagesDeadLettered
+        # Every service's KafkaConfig logs this line before copying the record to <topic>-dlt.
+        expr: |
+          sum by (service) (count_over_time({level="ERROR"} |= "sent to dead-letter topic" [10m])) > 0
+        labels:
+          severity: warning
+          source: logs
+        annotations:
+          summary: "{{ $labels.service }} sent Kafka messages to a dead-letter topic"
+          description: "A consumer could not process a message after its retries. Check the -dlt topic in Kafka UI (http://localhost:8085)."
