@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Body of POST /predict (ml-service). Caller: ai-insights-service (ModelClient).",
+  "$defs": {
+    "Reading": {
+      "properties": {
+        "recordedAt": {
+          "format": "date-time",
+          "title": "Recordedat",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "recordedAt",
+        "value"
+      ],
+      "title": "Reading",
+      "type": "object"
+    },
+    "SensorInput": {
+      "properties": {
+        "sensorType": {
+          "title": "Sensortype",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "warningThreshold": {
+          "exclusiveMinimum": 0,
+          "title": "Warningthreshold",
+          "type": "number"
+        },
+        "criticalThreshold": {
+          "exclusiveMinimum": 0,
+          "title": "Criticalthreshold",
+          "type": "number"
+        },
+        "readings": {
+          "items": {
+            "$ref": "#/$defs/Reading"
+          },
+          "title": "Readings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sensorType",
+        "warningThreshold",
+        "criticalThreshold",
+        "readings"
+      ],
+      "title": "SensorInput",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "assetId": {
+      "title": "Assetid",
+      "type": "string"
+    },
+    "sensors": {
+      "items": {
+        "$ref": "#/$defs/SensorInput"
+      },
+      "minItems": 1,
+      "title": "Sensors",
+      "type": "array"
+    }
+  },
+  "required": [
+    "assetId",
+    "sensors"
+  ],
+  "title": "PredictionRequest",
+  "type": "object"
+}

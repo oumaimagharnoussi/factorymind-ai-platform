@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorymind.local/contracts/kafka/factorymind.maintenance.work-orders.schema.json",
+  "title": "Work order event",
+  "description": "Value of the records on factorymind.maintenance.work-orders. Producer: maintenance-service. Consumers: alert-service, ai-insights-service, notification-service. Record key: assetId. New optional fields may be added; removing or renaming a field, or adding an enum value, needs the consumers first (see contracts/README.md).",
+  "x-producer": "maintenance-service",
+  "x-consumers": [
+    "alert-service",
+    "ai-insights-service",
+    "notification-service"
+  ],
+  "type": "object",
+  "required": [
+    "eventType",
+    "workOrderId",
+    "code",
+    "assetId",
+    "alertIds",
+    "type",
+    "priority",
+    "status",
+    "title",
+    "assignee",
+    "actor",
+    "occurredAt"
+  ],
+  "properties": {
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "CREATED",
+        "UPDATED",
+        "STATUS_CHANGED",
+        "ALERT_LINKED",
+        "PART_USED",
+        "PART_RETURNED"
+      ],
+      "description": "What happened to the work order"
+    },
+    "workOrderId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Work order"
+    },
+    "code": {
+      "type": "string",
+      "description": "Human code, e.g. WO-00042",
+      "pattern": "^WO-[0-9]+$"
+    },
+    "assetId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Machine (record key)"
+    },
+    "alertIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "uniqueItems": true,
+      "description": "Alerts this work order handles (empty for a planned or AI work order)"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "CORRECTIVE",
+        "PREVENTIVE",
+        "INSPECTION"
+      ],
+      "description": "Kind of work"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "URGENT"
+      ],
+      "description": "Priority"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "IN_PROGRESS",
+        "ON_HOLD",
+        "COMPLETED",
+        "CANCELLED"
+      ],
+      "description": "Status after the event"
+    },
+    "title": {
+      "type": "string",
+      "description": "Title",
+      "minLength": 1
+    },
+    "assignee": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Technician, if assigned"
+    },
+    "actor": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Who did it: the user name, or alert-service / ai-insights for automatic work orders"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this event happened"
+    }
+  },
+  "additionalProperties": true
+}

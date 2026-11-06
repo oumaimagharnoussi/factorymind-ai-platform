@@ -1,0 +1,15 @@
+{
+  "eventType": "ESCALATED",
+  "alertId": "7255d668-1809-44da-a724-9b09c6ac8c63",
+  "assetId": "33333333-0000-0000-0000-000000000102",
+  "sensorType": "PRESSURE",
+  "severity": "CRITICAL",
+  "status": "OPEN",
+  "active": true,
+  "value": 214.7,
+  "unit": "bar",
+  "warningThreshold": 180.0,
+  "criticalThreshold": 210.0,
+  "raisedAt": "2026-11-06T10:21:10.895Z",
+  "occurredAt": "2026-11-06T10:22:28.120Z"
+}

@@ -1,0 +1,14 @@
+{
+  "assetId": "33333333-0000-0000-0000-000000000102",
+  "previousLevel": "MEDIUM",
+  "riskLevel": "HIGH",
+  "riskScore": 0.83,
+  "mainSensorType": "PRESSURE",
+  "hoursToCritical": 1.5,
+  "drivers": [
+    "pressure rising 12.4 bar/h",
+    "at 94% of the critical limit"
+  ],
+  "modelVersion": "rf-24h-3f9a1c2e",
+  "assessedAt": "2026-11-06T10:19:40Z"
+}

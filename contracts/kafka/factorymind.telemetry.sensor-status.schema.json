@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorymind.local/contracts/kafka/factorymind.telemetry.sensor-status.schema.json",
+  "title": "Sensor status change (NORMAL / WARNING / CRITICAL)",
+  "description": "Value of the records on factorymind.telemetry.sensor-status. Producer: telemetry-service. Consumers: alert-service. Record key: assetId. New optional fields may be added; removing or renaming a field, or adding an enum value, needs the consumers first (see contracts/README.md).",
+  "x-producer": "telemetry-service",
+  "x-consumers": [
+    "alert-service"
+  ],
+  "type": "object",
+  "required": [
+    "assetId",
+    "sensorType",
+    "previousStatus",
+    "status",
+    "value",
+    "unit",
+    "warningThreshold",
+    "criticalThreshold",
+    "recordedAt"
+  ],
+  "properties": {
+    "assetId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Machine (record key)"
+    },
+    "sensorType": {
+      "type": "string",
+      "enum": [
+        "TEMPERATURE",
+        "VIBRATION",
+        "PRESSURE",
+        "ROTATION_SPEED"
+      ],
+      "description": "Sensor whose status changed"
+    },
+    "previousStatus": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "NORMAL",
+        "WARNING",
+        "CRITICAL",
+        "UNKNOWN",
+        null
+      ],
+      "description": "Status before this reading; null for the first reading of the sensor"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "NORMAL",
+        "WARNING",
+        "CRITICAL",
+        "UNKNOWN"
+      ],
+      "description": "Status after this reading"
+    },
+    "value": {
+      "type": "number",
+      "description": "The reading that changed the status"
+    },
+    "unit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Unit of the value; null when the sensor definition is not known yet"
+    },
+    "warningThreshold": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Limit in force; null when the sensor definition is not known yet"
+    },
+    "criticalThreshold": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Limit in force; null when the sensor definition is not known yet"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the reading was measured"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,8 @@
+{
+  "sensorId": "44444444-0000-0000-0000-000000001021",
+  "assetId": "33333333-0000-0000-0000-000000000102",
+  "sensorType": "PRESSURE",
+  "unit": "bar",
+  "warningThreshold": 180.0,
+  "criticalThreshold": 210.0
+}

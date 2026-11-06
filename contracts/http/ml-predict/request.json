@@ -1,0 +1,117 @@
+{
+  "assetId": "33333333-0000-0000-0000-000000000102",
+  "sensors": [
+    {
+      "sensorType": "PRESSURE",
+      "unit": "bar",
+      "warningThreshold": 180.0,
+      "criticalThreshold": 210.0,
+      "readings": [
+        {
+          "recordedAt": "2026-11-06T10:00:00Z",
+          "value": 160.0
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:10Z",
+          "value": 163.27
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:20Z",
+          "value": 166.55
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:30Z",
+          "value": 169.82
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:40Z",
+          "value": 173.09
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:50Z",
+          "value": 176.36
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:00Z",
+          "value": 179.64
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:10Z",
+          "value": 182.91
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:20Z",
+          "value": 186.18
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:30Z",
+          "value": 189.45
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:40Z",
+          "value": 192.73
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:50Z",
+          "value": 196.0
+        }
+      ]
+    },
+    {
+      "sensorType": "TEMPERATURE",
+      "unit": "°C",
+      "warningThreshold": 80.0,
+      "criticalThreshold": 95.0,
+      "readings": [
+        {
+          "recordedAt": "2026-11-06T10:00:00Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:10Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:20Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:30Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:40Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:00:50Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:00Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:10Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:20Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:30Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:40Z",
+          "value": 61.5
+        },
+        {
+          "recordedAt": "2026-11-06T10:01:50Z",
+          "value": 61.5
+        }
+      ]
+    }
+  ]
+}

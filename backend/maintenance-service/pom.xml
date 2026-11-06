@@ -106,6 +106,12 @@
             <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Contract tests: Kafka messages checked against the shared JSON Schemas in contracts/. -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

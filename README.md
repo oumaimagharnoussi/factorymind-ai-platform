@@ -1,5 +1,7 @@
 # FactoryMind AI — Smart Industrial Operations Platform
 
+[![backend-ci](https://github.com/oumaimagharnoussi/factorymind-ai-platform/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/oumaimagharnoussi/factorymind-ai-platform/actions/workflows/backend-ci.yml) [![frontend-ci](https://github.com/oumaimagharnoussi/factorymind-ai-platform/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/oumaimagharnoussi/factorymind-ai-platform/actions/workflows/frontend-ci.yml) [![ml-ci](https://github.com/oumaimagharnoussi/factorymind-ai-platform/actions/workflows/ml-ci.yml/badge.svg)](https://github.com/oumaimagharnoussi/factorymind-ai-platform/actions/workflows/ml-ci.yml) [![observability-ci](https://github.com/oumaimagharnoussi/factorymind-ai-platform/actions/workflows/observability-ci.yml/badge.svg)](https://github.com/oumaimagharnoussi/factorymind-ai-platform/actions/workflows/observability-ci.yml)
+
 FactoryMind AI watches factory machines, detects abnormal behaviour and helps maintenance teams act before a
 breakdown stops production. It is built as event-driven Spring Boot microservices with an Angular front end,
 a Python ML service and Power BI analytics.
@@ -7,19 +9,39 @@ a Python ML service and Power BI analytics.
 > **Demo project.** All factories, machines and sensor data are simulated. Thresholds in the demo data are
 > illustrative, not industrial limits.
 
-![Dashboard](docs/demo/dashboard.png)
+![A machine fails: the AI risk rises, an alert opens a work order, the engineer is notified](docs/demo/tour.gif)
 
-![Live monitoring](docs/demo/monitoring.png)
+**[10-minute demo script](docs/demo/DEMO.md)** · [Architecture decisions](docs/adr) ·
+[Service contracts](contracts/README.md) · [Run it](#run-it)
 
-![Alerts](docs/demo/alerts.png)
+## Highlights
 
-![Work order](docs/demo/work-order.png)
+- **One real flow end to end.** A sensor drifts; a scikit-learn model rates the machine HIGH risk and an
+  inspection is planned; the sensor crosses its limit; an alert is raised, an urgent work order is opened, the
+  on-call engineer gets an e-mail and the bell rings; the repair uses spare parts and resolves the alert. No
+  service calls another to make this happen: they react to Kafka events.
+- **Nine Spring Boot 4 services (Java 25), a Python model, an Angular 22 app**, each service with its own
+  PostgreSQL database, behind a Spring Cloud Gateway.
+- **Security**: Keycloak (OIDC with PKCE), JWT checked in the gateway and in every service, three roles, and the
+  OAuth2 client-credentials grant between services.
+- **Reliability patterns**: idempotent consumers, dead-letter topics, a transactional outbox with retries and
+  throttling for notifications, debounced alerts.
+- **AI**: failure-risk model with a model card and measured precision/recall, a maintenance copilot (RAG with
+  hybrid full-text + pgvector search, cited sources, tool calls on live data) with Spring AI.
+- **Observability**: Prometheus metrics (technical and business), OpenTelemetry traces in Tempo, logs in Loki,
+  all linked in Grafana; Prometheus and Loki alert rules routed by Alertmanager to e-mail, Teams and the app.
+- **Tested and shipped**: unit and Testcontainers integration tests (Postgres, Kafka, SMTP), **contract tests on
+  every Kafka topic and on the model API**, Vitest, pytest; GitHub Actions CI, Docker images on GHCR, production
+  Compose behind Caddy with HTTPS.
 
-![Notifications](docs/demo/notifications.png)
+| | |
+|---|---|
+| ![Dashboard](docs/demo/dashboard.png) | ![Live monitoring](docs/demo/monitoring.png) |
+| ![AI risk center](docs/demo/ai-insights.png) | ![Alerts](docs/demo/alerts.png) |
+| ![Work order](docs/demo/work-order.png) | ![Analytics](docs/demo/analytics.png) |
+| ![Notifications](docs/demo/notifications.png) | ![Logs in Grafana Loki](docs/demo/logs.png) |
 
-![Logs in Grafana Loki](docs/demo/logs.png)
-
-## What works today (phases 1–10)
+## What works today (phases 1–11)
 
 | Area | Status |
 |---|---|
@@ -50,9 +72,39 @@ a Python ML service and Power BI analytics.
 | Notification service: sensor alerts, work orders, AI failure risk and Prometheus alerts (through Alertmanager) routed by editable rules to e-mail, Microsoft Teams and an in-app bell, with throttling, retries and a delivery log | ✅ |
 | Service-to-service call with OAuth2 client credentials (notification-service reads machine names from asset-service) | ✅ |
 | Central logs: every container's output in Grafana Loki (collected by Grafana Alloy), JSON lines with trace ids, log ↔ trace links, a Logs dashboard and alert rules on the logs (error bursts, dead-lettered Kafka messages) | ✅ |
-| Contract tests | Later |
+| Contract tests: JSON Schemas of the six Kafka topics and of the model API in `contracts/`, checked by every producer and consumer (and by the Python model) on each build | ✅ |
+| Demo GIF, 10-minute demo script, recruiter-friendly README | ✅ |
 
 ## Architecture
+
+```mermaid
+flowchart LR
+    user([Browser<br/>Angular 22]) -->|OIDC + PKCE| kc[Keycloak]
+    user -->|JWT, SSE| gw[API Gateway]
+    gw --> asset[asset-service]
+    gw --> tel[telemetry-service]
+    gw --> alert[alert-service]
+    gw --> mnt[maintenance-service]
+    gw --> inv[inventory-service]
+    gw --> ai[ai-insights-service]
+    gw --> ana[analytics-service]
+    gw --> notif[notification-service]
+    sim[Sensors / simulator] -->|readings| kafka{{Kafka}}
+    asset -->|sensor limits| kafka
+    kafka --> tel -->|status changes| kafka
+    kafka --> alert -->|alerts| kafka
+    kafka --> mnt -->|work orders| kafka
+    kafka --> ai -->|risk levels| kafka
+    kafka --> notif
+    ai -->|POST /predict| ml[ML model<br/>Python]
+    mnt -->|parts| inv
+    notif -->|e-mail, Teams| people([On-call, IT, reliability])
+    ana -->|warehouse| pbi[Power BI]
+    obs[Prometheus · Tempo · Loki · Grafana · Alertmanager] -.->|metrics, traces, logs| gw
+    obs -.->|alerts| notif
+```
+
+Each service owns its PostgreSQL database. Ports, databases and topics in detail:
 
 ```
                  login (PKCE)
@@ -298,6 +350,10 @@ cd frontend/factorymind-web && npx ng test --watch=false
 cd ml/predictive-maintenance && python -m pytest -q
 ```
 
+The contract tests (`KafkaContractTest` in each service using Kafka, `MlPredictContractTest`, `test_contracts.py`)
+read the shared files in `contracts/`; see [contracts/README.md](contracts/README.md) for what they check and how
+to change a message without breaking another service ([ADR 0011](docs/adr/0011-contract-tests.md)).
+
 ## Deploy
 
 `docker-compose.prod.yml` runs the published images behind Caddy (automatic HTTPS), with Keycloak at
@@ -417,6 +473,7 @@ backend/          Maven multi-module: asset, telemetry, alert, maintenance, inve
 frontend/         Angular app (factorymind-web)
 ml/               Python failure-risk model: features, simulated training data, training, FastAPI service
 analytics/        Power BI measures and project, warehouse overview (pipeline: backend/analytics-service)
+contracts/        JSON Schemas + examples of the Kafka messages and of the model API, checked by both sides
 infrastructure/   Database init script, Keycloak realm, Caddy, Prometheus (scrape + alert rules), Alertmanager, Tempo, Loki (+ log alert rules), Alloy, Grafana (data sources, dashboards)
-docs/             ADRs, architecture notes, screenshots
+docs/             ADRs, demo script, screenshots and demo GIF
 ```

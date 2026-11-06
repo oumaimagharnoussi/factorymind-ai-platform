@@ -1,0 +1,16 @@
+{
+  "eventType": "CREATED",
+  "workOrderId": "5f1e2d3c-4b5a-4968-8776-655443322110",
+  "code": "WO-00006",
+  "assetId": "33333333-0000-0000-0000-000000000102",
+  "alertIds": [
+    "7255d668-1809-44da-a724-9b09c6ac8c63"
+  ],
+  "type": "CORRECTIVE",
+  "priority": "URGENT",
+  "status": "OPEN",
+  "title": "PRESSURE critical on M-102",
+  "assignee": null,
+  "actor": "alert-service",
+  "occurredAt": "2026-11-06T10:22:28.410Z"
+}

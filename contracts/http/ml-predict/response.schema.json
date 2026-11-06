@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "200 answer of POST /predict (ml-service). Reader: ai-insights-service (Prediction).",
+  "$defs": {
+    "SensorRisk": {
+      "properties": {
+        "sensorType": {
+          "title": "Sensortype",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unit"
+        },
+        "currentValue": {
+          "title": "Currentvalue",
+          "type": "number"
+        },
+        "failureProbability": {
+          "title": "Failureprobability",
+          "type": "number"
+        },
+        "riskLevel": {
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "title": "Risklevel",
+          "type": "string"
+        },
+        "trendPerHour": {
+          "title": "Trendperhour",
+          "type": "number"
+        },
+        "hoursToCritical": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Hourstocritical"
+        },
+        "drivers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Drivers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sensorType",
+        "unit",
+        "currentValue",
+        "failureProbability",
+        "riskLevel",
+        "trendPerHour",
+        "hoursToCritical",
+        "drivers"
+      ],
+      "title": "SensorRisk",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "assetId": {
+      "title": "Assetid",
+      "type": "string"
+    },
+    "riskScore": {
+      "title": "Riskscore",
+      "type": "number"
+    },
+    "riskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "Risklevel",
+      "type": "string"
+    },
+    "horizonHours": {
+      "title": "Horizonhours",
+      "type": "number"
+    },
+    "mainSensorType": {
+      "title": "Mainsensortype",
+      "type": "string"
+    },
+    "sensors": {
+      "items": {
+        "$ref": "#/$defs/SensorRisk"
+      },
+      "title": "Sensors",
+      "type": "array"
+    },
+    "modelVersion": {
+      "title": "Modelversion",
+      "type": "string"
+    }
+  },
+  "required": [
+    "assetId",
+    "riskScore",
+    "riskLevel",
+    "horizonHours",
+    "mainSensorType",
+    "sensors",
+    "modelVersion"
+  ],
+  "title": "PredictionResponse",
+  "type": "object"
+}

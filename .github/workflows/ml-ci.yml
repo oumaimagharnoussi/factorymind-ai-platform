@@ -2,9 +2,9 @@ name: ml-ci
 
 on:
   push:
-    paths: ["ml/**", ".github/workflows/ml-ci.yml"]
+    paths: ["ml/**", "contracts/http/**", ".github/workflows/ml-ci.yml"]
   pull_request:
-    paths: ["ml/**", ".github/workflows/ml-ci.yml"]
+    paths: ["ml/**", "contracts/http/**", ".github/workflows/ml-ci.yml"]
 
 defaults:
   run:

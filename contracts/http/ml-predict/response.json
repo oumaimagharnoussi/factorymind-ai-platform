@@ -1,0 +1,36 @@
+{
+  "assetId": "33333333-0000-0000-0000-000000000102",
+  "riskScore": 0.984,
+  "riskLevel": "HIGH",
+  "horizonHours": 24.0,
+  "mainSensorType": "PRESSURE",
+  "sensors": [
+    {
+      "sensorType": "PRESSURE",
+      "unit": "bar",
+      "currentValue": 196.0,
+      "failureProbability": 0.984,
+      "riskLevel": "HIGH",
+      "trendPerHour": 1178.157,
+      "hoursToCritical": 0.01,
+      "drivers": [
+        "trend reaches the critical limit in about 1 min",
+        "42% of recent readings at or above the warning limit",
+        "rising 1178.16 bar/h (561.0% of the critical limit per hour)"
+      ]
+    },
+    {
+      "sensorType": "TEMPERATURE",
+      "unit": "°C",
+      "currentValue": 61.5,
+      "failureProbability": 0.149,
+      "riskLevel": "LOW",
+      "trendPerHour": -0.0,
+      "hoursToCritical": null,
+      "drivers": [
+        "stable at 65% of the critical limit"
+      ]
+    }
+  ],
+  "modelVersion": "rf-24h-387d6e85"
+}

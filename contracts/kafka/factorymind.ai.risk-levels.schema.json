@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorymind.local/contracts/kafka/factorymind.ai.risk-levels.schema.json",
+  "title": "Failure-risk level change of a machine",
+  "description": "Value of the records on factorymind.ai.risk-levels. Producer: ai-insights-service. Consumers: maintenance-service, notification-service. Record key: assetId. New optional fields may be added; removing or renaming a field, or adding an enum value, needs the consumers first (see contracts/README.md).",
+  "x-producer": "ai-insights-service",
+  "x-consumers": [
+    "maintenance-service",
+    "notification-service"
+  ],
+  "type": "object",
+  "required": [
+    "assetId",
+    "previousLevel",
+    "riskLevel",
+    "riskScore",
+    "mainSensorType",
+    "hoursToCritical",
+    "drivers",
+    "modelVersion",
+    "assessedAt"
+  ],
+  "properties": {
+    "assetId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Machine (record key)"
+    },
+    "previousLevel": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        null
+      ],
+      "description": "Level before; null for the first assessment"
+    },
+    "riskLevel": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "description": "New level"
+    },
+    "riskScore": {
+      "type": "number",
+      "description": "Probability that a sensor reaches its critical limit within the horizon",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mainSensorType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Sensor that drives the risk"
+    },
+    "hoursToCritical": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Estimated hours before the critical limit at the current trend; null if not rising",
+      "minimum": 0
+    },
+    "drivers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Reasons, in plain words"
+    },
+    "modelVersion": {
+      "type": "string",
+      "description": "Version of the model that made the prediction",
+      "minLength": 1
+    },
+    "assessedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the prediction was made"
+    }
+  },
+  "additionalProperties": true
+}

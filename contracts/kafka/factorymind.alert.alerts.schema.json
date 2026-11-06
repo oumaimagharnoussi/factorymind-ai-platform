@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorymind.local/contracts/kafka/factorymind.alert.alerts.schema.json",
+  "title": "Alert lifecycle event",
+  "description": "Value of the records on factorymind.alert.alerts. Producer: alert-service. Consumers: maintenance-service, ai-insights-service, notification-service. Record key: assetId. New optional fields may be added; removing or renaming a field, or adding an enum value, needs the consumers first (see contracts/README.md).",
+  "x-producer": "alert-service",
+  "x-consumers": [
+    "maintenance-service",
+    "ai-insights-service",
+    "notification-service"
+  ],
+  "type": "object",
+  "required": [
+    "eventType",
+    "alertId",
+    "assetId",
+    "sensorType",
+    "severity",
+    "status",
+    "active",
+    "value",
+    "unit",
+    "warningThreshold",
+    "criticalThreshold",
+    "raisedAt",
+    "occurredAt"
+  ],
+  "properties": {
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "RAISED",
+        "ESCALATED",
+        "RETRIGGERED",
+        "CLEARED",
+        "ACKNOWLEDGED",
+        "RESOLVED",
+        "WORK_ORDER_UPDATED"
+      ],
+      "description": "What happened to the alert"
+    },
+    "alertId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Alert"
+    },
+    "assetId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Machine (record key)"
+    },
+    "sensorType": {
+      "type": "string",
+      "enum": [
+        "TEMPERATURE",
+        "VIBRATION",
+        "PRESSURE",
+        "ROTATION_SPEED"
+      ],
+      "description": "Sensor in alarm"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "WARNING",
+        "CRITICAL"
+      ],
+      "description": "Highest level reached"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "ACKNOWLEDGED",
+        "RESOLVED"
+      ],
+      "description": "Workflow status"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "true while the sensor is still outside its limits"
+    },
+    "value": {
+      "type": "number",
+      "description": "Last value of the sensor"
+    },
+    "unit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Unit of the value"
+    },
+    "warningThreshold": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Warning limit when the alert was raised"
+    },
+    "criticalThreshold": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Critical limit when the alert was raised"
+    },
+    "raisedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the alert was raised"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this event happened"
+    }
+  },
+  "additionalProperties": true
+}

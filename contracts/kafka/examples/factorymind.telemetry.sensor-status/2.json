@@ -1,0 +1,11 @@
+{
+  "assetId": "33333333-0000-0000-0000-000000000104",
+  "sensorType": "VIBRATION",
+  "previousStatus": null,
+  "status": "UNKNOWN",
+  "value": 3.1,
+  "unit": null,
+  "warningThreshold": null,
+  "criticalThreshold": null,
+  "recordedAt": "2026-11-06T10:00:00Z"
+}

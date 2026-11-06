@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorymind.local/contracts/kafka/factorymind.telemetry.readings.schema.json",
+  "title": "Sensor reading",
+  "description": "Value of the records on factorymind.telemetry.readings. Producer: telemetry-service (simulator and POST /api/telemetry/readings). Consumers: telemetry-service, ai-insights-service. Record key: assetId. New optional fields may be added; removing or renaming a field, or adding an enum value, needs the consumers first (see contracts/README.md).",
+  "x-producer": "telemetry-service (simulator and POST /api/telemetry/readings)",
+  "x-consumers": [
+    "telemetry-service",
+    "ai-insights-service"
+  ],
+  "type": "object",
+  "required": [
+    "readingId",
+    "assetId",
+    "sensorType",
+    "value",
+    "recordedAt"
+  ],
+  "properties": {
+    "readingId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique id of the reading (consumers ignore a reading id they already stored)"
+    },
+    "assetId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Machine (also the record key, so the readings of one machine stay in order)"
+    },
+    "sensorType": {
+      "type": "string",
+      "enum": [
+        "TEMPERATURE",
+        "VIBRATION",
+        "PRESSURE",
+        "ROTATION_SPEED"
+      ],
+      "description": "What was measured"
+    },
+    "value": {
+      "type": "number",
+      "description": "Measured value, in the unit of the sensor definition"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the sensor measured it"
+    }
+  },
+  "additionalProperties": true
+}

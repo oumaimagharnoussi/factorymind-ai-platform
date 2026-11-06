@@ -1,0 +1,11 @@
+{
+  "assetId": "33333333-0000-0000-0000-000000000102",
+  "sensorType": "PRESSURE",
+  "previousStatus": "WARNING",
+  "status": "CRITICAL",
+  "value": 214.7,
+  "unit": "bar",
+  "warningThreshold": 180.0,
+  "criticalThreshold": 210.0,
+  "recordedAt": "2026-11-06T10:22:13.004Z"
+}

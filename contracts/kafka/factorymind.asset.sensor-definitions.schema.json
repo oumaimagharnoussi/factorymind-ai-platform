@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factorymind.local/contracts/kafka/factorymind.asset.sensor-definitions.schema.json",
+  "title": "Sensor definition (alarm limits of one sensor)",
+  "description": "Value of the records on factorymind.asset.sensor-definitions. Producer: asset-service. Consumers: telemetry-service, ai-insights-service. Record key: sensorId. Compacted topic. Key = sensor id. A null value (tombstone) means the sensor was deleted. New optional fields may be added; removing or renaming a field, or adding an enum value, needs the consumers first (see contracts/README.md).",
+  "x-producer": "asset-service",
+  "x-consumers": [
+    "telemetry-service",
+    "ai-insights-service"
+  ],
+  "type": "object",
+  "required": [
+    "sensorId",
+    "assetId",
+    "sensorType",
+    "unit",
+    "warningThreshold",
+    "criticalThreshold"
+  ],
+  "properties": {
+    "sensorId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Sensor id (also the record key)"
+    },
+    "assetId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Machine the sensor is mounted on"
+    },
+    "sensorType": {
+      "type": "string",
+      "enum": [
+        "TEMPERATURE",
+        "VIBRATION",
+        "PRESSURE",
+        "ROTATION_SPEED"
+      ],
+      "description": "What the sensor measures"
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unit of the values, e.g. °C, mm/s, bar, rpm",
+      "minLength": 1
+    },
+    "warningThreshold": {
+      "type": "number",
+      "description": "Value from which a reading is WARNING"
+    },
+    "criticalThreshold": {
+      "type": "number",
+      "description": "Value from which a reading is CRITICAL"
+    }
+  },
+  "additionalProperties": true
+}
