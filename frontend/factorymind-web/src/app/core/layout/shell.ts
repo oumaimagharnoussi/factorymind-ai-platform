@@ -44,6 +44,7 @@ export class Shell {
     { path: '/monitoring', label: 'Live monitoring', icon: 'monitor_heart' },
     { path: '/alerts', label: 'Alerts', icon: 'notifications' },
     { path: '/maintenance/orders', label: 'Work orders', icon: 'build' },
+    { path: '/maintenance/plans', label: 'Maintenance plans', icon: 'event_repeat' },
     { path: '/inventory', label: 'Spare parts', icon: 'inventory_2' },
     { path: '/ai-insights', label: 'AI risk center', icon: 'insights' },
     { path: '/copilot', label: 'Maintenance copilot', icon: 'smart_toy' },

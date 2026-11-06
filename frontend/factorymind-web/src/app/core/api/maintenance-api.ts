@@ -3,8 +3,10 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   CreateWorkOrderRequest,
+  MaintenancePlan,
   MaintenanceSummary,
   Page,
+  PlanRequest,
   WorkOrder,
   WorkOrderQuery,
   WorkOrderStatus,
@@ -21,6 +23,7 @@ export class MaintenanceApi {
     for (const status of query.statuses ?? []) params = params.append('status', status);
     if (query.priority) params = params.set('priority', query.priority);
     if (query.assetId) params = params.set('assetId', query.assetId);
+    if (query.planId) params = params.set('planId', query.planId);
     if (query.q?.trim()) params = params.set('q', query.q.trim());
     return this.http.get<Page<WorkOrderSummary>>('/api/maintenance/work-orders', { params });
   }
@@ -48,5 +51,36 @@ export class MaintenanceApi {
 
   returnPart(id: string, lineId: string): Observable<WorkOrder> {
     return this.http.delete<WorkOrder>(`/api/maintenance/work-orders/${id}/parts/${lineId}`);
+  }
+
+  /** Preventive maintenance plans, soonest due first. */
+  plans(assetId?: string | null): Observable<MaintenancePlan[]> {
+    const params = assetId ? new HttpParams().set('assetId', assetId) : undefined;
+    return this.http.get<MaintenancePlan[]>('/api/maintenance/plans', { params });
+  }
+
+  plan(id: string): Observable<MaintenancePlan> {
+    return this.http.get<MaintenancePlan>(`/api/maintenance/plans/${id}`);
+  }
+
+  createPlan(request: PlanRequest): Observable<MaintenancePlan> {
+    return this.http.post<MaintenancePlan>('/api/maintenance/plans', request);
+  }
+
+  updatePlan(id: string, request: PlanRequest): Observable<MaintenancePlan> {
+    return this.http.put<MaintenancePlan>(`/api/maintenance/plans/${id}`, request);
+  }
+
+  pausePlan(id: string): Observable<MaintenancePlan> {
+    return this.http.post<MaintenancePlan>(`/api/maintenance/plans/${id}/pause`, null);
+  }
+
+  resumePlan(id: string): Observable<MaintenancePlan> {
+    return this.http.post<MaintenancePlan>(`/api/maintenance/plans/${id}/resume`, null);
+  }
+
+  /** Opens the plan's next work order now instead of waiting for its lead time. */
+  openPlanWorkOrder(id: string): Observable<WorkOrderSummary> {
+    return this.http.post<WorkOrderSummary>(`/api/maintenance/plans/${id}/work-orders`, null);
   }
 }

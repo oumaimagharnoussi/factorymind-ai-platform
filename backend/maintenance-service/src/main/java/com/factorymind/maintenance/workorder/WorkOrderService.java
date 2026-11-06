@@ -39,6 +39,8 @@ public class WorkOrderService {
 
     static final String ALERT_SERVICE = "alert-service";
     static final String AI_INSIGHTS = "ai-insights";
+    /** Actor of the work orders opened from preventive maintenance plans. */
+    public static final String PLANNER = "maintenance-planner";
     private static final List<WorkOrderStatus> OPEN_STATUSES =
             List.of(WorkOrderStatus.OPEN, WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.ON_HOLD);
 
@@ -186,6 +188,20 @@ public class WorkOrderService {
                 null, today(), AI_INSIGHTS, clock.instant()));
         log.info("Planned {} for machine {} (risk {})", workOrder.getCode(), risk.assetId(), risk.riskScore());
         announce(ActivityType.CREATED, workOrder, AI_INSIGHTS);
+    }
+
+    /**
+     * Opens the work order for one occurrence of a preventive maintenance plan. The plan's own rules (when it is
+     * due, one open job at a time) are checked by the planner; the database refuses a second open job too.
+     */
+    @Transactional
+    public WorkOrderSummary openForPlan(PlannedJob job) {
+        WorkOrder workOrder = workOrders.save(WorkOrder.forPlan(nextCode(), job.planId(), job.planCode(),
+                job.assetId(), job.priority(), job.title(), job.description(), job.assignee(), job.dueDate(), PLANNER,
+                clock.instant()));
+        log.info("Opened {} from maintenance plan {}, due {}", workOrder.getCode(), job.planCode(), job.dueDate());
+        announce(ActivityType.CREATED, workOrder, PLANNER);
+        return WorkOrderSummary.of(workOrder, today());
     }
 
     public MaintenanceSummary summary() {

@@ -27,12 +27,16 @@ class KafkaContractTest {
         for (ActivityType type : ActivityType.values()) {
             Contracts.assertProduces(WORK_ORDERS, new WorkOrderEventMessage(type, UUID.randomUUID(), "WO-00042", machine,
                     Set.of(UUID.randomUUID()), WorkOrderType.CORRECTIVE, WorkOrderPriority.URGENT, WorkOrderStatus.OPEN,
-                    "PRESSURE critical on M-102", "engineer", "alert-service", Instant.now()));
+                    "PRESSURE critical on M-102", "engineer", "alert-service", null, Instant.now()));
         }
         // A planned work order: no alert, nobody assigned yet.
         Contracts.assertProduces(WORK_ORDERS, new WorkOrderEventMessage(ActivityType.CREATED, UUID.randomUUID(), "WO-00043",
                 machine, Set.of(), WorkOrderType.INSPECTION, WorkOrderPriority.HIGH, WorkOrderStatus.OPEN,
-                "Inspect M-102: failure risk HIGH", null, "ai-insights", Instant.now()));
+                "Inspect M-102: failure risk HIGH", null, "ai-insights", null, Instant.now()));
+        // An occurrence of a preventive maintenance plan.
+        Contracts.assertProduces(WORK_ORDERS, new WorkOrderEventMessage(ActivityType.CREATED, UUID.randomUUID(), "WO-00044",
+                machine, Set.of(), WorkOrderType.PREVENTIVE, WorkOrderPriority.MEDIUM, WorkOrderStatus.OPEN,
+                "Lubricate conveyor motor bearings", "engineer", "maintenance-planner", UUID.randomUUID(), Instant.now()));
         Contracts.assertEnumsDeclared(WORK_ORDERS, WorkOrderEventMessage.class);
     }
 

@@ -27,6 +27,8 @@ class WorkOrderMetricsTest {
         metrics.onWorkOrderEvent(event(ActivityType.CREATED, WorkOrderType.INSPECTION, WorkOrderStatus.OPEN,
                 WorkOrderService.AI_INSIGHTS));
         metrics.onWorkOrderEvent(event(ActivityType.CREATED, WorkOrderType.PREVENTIVE, WorkOrderStatus.OPEN, "engineer"));
+        metrics.onWorkOrderEvent(event(ActivityType.CREATED, WorkOrderType.PREVENTIVE, WorkOrderStatus.OPEN,
+                WorkOrderService.PLANNER));
         metrics.onWorkOrderEvent(event(ActivityType.STATUS_CHANGED, WorkOrderType.INSPECTION, WorkOrderStatus.COMPLETED,
                 "engineer"));
         metrics.onWorkOrderEvent(event(ActivityType.STATUS_CHANGED, WorkOrderType.INSPECTION, WorkOrderStatus.IN_PROGRESS,
@@ -35,6 +37,7 @@ class WorkOrderMetricsTest {
         assertThat(created("ALERT")).isEqualTo(1);
         assertThat(created("AI_PREDICTION")).isEqualTo(1);
         assertThat(created("USER")).isEqualTo(1);
+        assertThat(created("PLAN")).isEqualTo(1);
         assertThat(registry.get("factorymind.workorders.closed").tag("status", "COMPLETED").counter().count()).isEqualTo(1);
         assertThat(registry.find("factorymind.workorders.closed").tag("status", "IN_PROGRESS").counter()).isNull();
     }
@@ -59,7 +62,7 @@ class WorkOrderMetricsTest {
     private static WorkOrderEventMessage event(ActivityType type, WorkOrderType workType, WorkOrderStatus status,
                                                String actor) {
         return new WorkOrderEventMessage(type, UUID.randomUUID(), "WO-1", UUID.randomUUID(), Set.of(), workType,
-                WorkOrderPriority.HIGH, status, "title", null, actor, Instant.now());
+                WorkOrderPriority.HIGH, status, "title", null, actor, null, Instant.now());
     }
 
     private static WorkOrderRepository.CountByKey count(WorkOrderStatus status, long total) {

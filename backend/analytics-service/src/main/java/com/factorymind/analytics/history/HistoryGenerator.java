@@ -207,7 +207,7 @@ public class HistoryGenerator {
             boolean clash = stops.stream().anyMatch(s -> s.from().isBefore(completed) && s.to().isAfter(started));
             if (!clash) {
                 orders.add(new WorkOrder(id(), null, asset.assetKey(), technician(), 6, "PREVENTIVE",
-                        "PLANNED", "MANUAL", "MEDIUM", null, latest(start, day.minus(Duration.ofDays(3))), started,
+                        "PLANNED", "PLAN", "MEDIUM", null, latest(start, day.minus(Duration.ofDays(3))), started,
                         completed,
                         money(40 + random.nextDouble() * 210), labor(started, completed)));
                 stops.add(new Stop(started, completed));

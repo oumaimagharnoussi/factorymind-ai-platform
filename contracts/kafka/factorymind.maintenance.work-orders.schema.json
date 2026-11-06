@@ -108,7 +108,15 @@
         "string",
         "null"
       ],
-      "description": "Who did it: the user name, or alert-service / ai-insights for automatic work orders"
+      "description": "Who did it: the user name, or alert-service / ai-insights / maintenance-planner for automatic work orders"
+    },
+    "planId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Preventive maintenance plan this work order is an occurrence of; null for any other work order. Added in phase 12: optional, so older events without it stay valid"
     },
     "occurredAt": {
       "type": "string",

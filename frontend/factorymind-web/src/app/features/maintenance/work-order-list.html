@@ -1,7 +1,10 @@
 <header class="page-header">
   <div>
     <h1>Work orders</h1>
-    <p class="subtitle">Maintenance jobs from request to completion. Critical alerts open one automatically.</p>
+    <p class="subtitle">
+      Maintenance jobs from request to completion. Critical alerts and
+      <a routerLink="/maintenance/plans">maintenance plans</a> open them automatically.
+    </p>
   </div>
   <a mat-flat-button routerLink="/maintenance/orders/new">
     <mat-icon>add</mat-icon>
@@ -67,6 +70,9 @@
         <strong>{{ w.code }}</strong>
         @if (w.alertIds.length) {
           <mat-icon inline class="from-alert" matTooltip="Opened for {{ w.alertIds.length }} alert(s)">notifications_active</mat-icon>
+        }
+        @if (w.planId) {
+          <mat-icon inline class="from-plan" matTooltip="Opened by a preventive maintenance plan">event_repeat</mat-icon>
         }
       </td>
     </ng-container>

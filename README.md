@@ -20,6 +20,9 @@ a Python ML service and Power BI analytics.
   inspection is planned; the sensor crosses its limit; an alert is raised, an urgent work order is opened, the
   on-call engineer gets an e-mail and the bell rings; the repair uses spare parts and resolves the alert. No
   service calls another to make this happen: they react to Kafka events.
+- **Corrective, predictive and preventive maintenance in one place**: alerts open repairs, the model opens
+  inspections, and maintenance plans open routine servicing a few days ahead (every N days on the calendar or after
+  the last job, one open job per plan, safe with several instances).
 - **Nine Spring Boot 4 services (Java 25), a Python model, an Angular 22 app**, each service with its own
   PostgreSQL database, behind a Spring Cloud Gateway.
 - **Security**: Keycloak (OIDC with PKCE), JWT checked in the gateway and in every service, three roles, and the
@@ -40,8 +43,9 @@ a Python ML service and Power BI analytics.
 | ![AI risk center](docs/demo/ai-insights.png) | ![Alerts](docs/demo/alerts.png) |
 | ![Work order](docs/demo/work-order.png) | ![Analytics](docs/demo/analytics.png) |
 | ![Notifications](docs/demo/notifications.png) | ![Logs in Grafana Loki](docs/demo/logs.png) |
+| ![Maintenance plans](docs/demo/maintenance-plans.png) | ![A maintenance plan and its work orders](docs/demo/plan-detail.png) |
 
-## What works today (phases 1–11)
+## What works today (phases 1–12)
 
 | Area | Status |
 |---|---|
@@ -62,7 +66,7 @@ a Python ML service and Power BI analytics.
 | AI insights service: live risk per machine from Kafka telemetry, inspection work order when a machine turns HIGH | ✅ |
 | Spring AI: maintenance report per machine (Claude or Ollama) | ✅ |
 | Maintenance copilot: RAG on machine manuals and procedures (hybrid search Postgres full-text + pgvector), cited sources, live plant data through tool calls, document upload (Markdown, text, PDF) | ✅ |
-| Preventive maintenance plans | Later |
+| Preventive maintenance plans: repeat a job on a machine every N days (on the calendar or after the last job); the planner opens the PREVENTIVE work order a few days ahead, one at a time, assigned to the usual technician | ✅ |
 | Analytics warehouse (star schema) loaded every 5 min from the services, simulated 6-month history for the demo | ✅ |
 | Analytics page: availability, MTBF, MTTR, maintenance cost, prediction precision and recall, per machine | ✅ |
 | Power BI model and reports (Executive, Reliability & Maintenance, AI Performance) on the warehouse | ✅ |
@@ -149,6 +153,9 @@ changes level. See [ADR 0003](docs/adr/0003-kafka-telemetry.md).
 A status change then becomes an alert once it lasts 15 s (and clears after 30 s back to normal); a critical
 alert opens an urgent work order, or joins the open one of the same machine; the technician books spare parts
 on it, which takes them out of stock. See [ADR 0004](docs/adr/0004-alerts-maintenance-inventory.md).
+Routine servicing comes from maintenance plans: every minute the planner opens the preventive work order of each
+plan that is due, a few days ahead and never two at a time for one plan. See
+[ADR 0012](docs/adr/0012-preventive-maintenance-plans.md).
 Every 10 s, ai-insights-service sends each machine's latest readings to the Python model, which returns the
 probability that a sensor reaches its critical limit within 24 h and the reasons; a machine that turns HIGH gets
 an inspection work order, usually minutes before the first alert in the demo. See
@@ -408,6 +415,10 @@ tests, builds and pushes the images to GHCR on every push to `main`, then update
 | PATCH | `/api/maintenance/work-orders/{id}/status` | Move in the workflow (`{"status", "note"}`; a note is required to complete) |
 | POST | `/api/maintenance/work-orders/{id}/parts` | Use a spare part (`{"partId", "quantity"}`), takes it out of stock |
 | DELETE | `/api/maintenance/work-orders/{id}/parts/{lineId}` | Remove a part line and return it to stock |
+| GET | `/api/maintenance/plans?assetId=&active=` | Preventive maintenance plans, soonest due first, with their state and open work order |
+| GET/POST/PUT | `/api/maintenance/plans`, `/api/maintenance/plans/{id}` | Create / read / edit a plan (machine, job, `schedule` FIXED or FLOATING, `intervalDays`, `leadDays`, priority, technician, `nextDueDate`) |
+| POST | `/api/maintenance/plans/{id}/pause`, `/api/maintenance/plans/{id}/resume` | Stop or restart a plan (plans are never deleted) |
+| POST | `/api/maintenance/plans/{id}/work-orders` | Open the plan's next work order now |
 
 ## API (inventory-service, through the gateway)
 

@@ -46,6 +46,9 @@ spring:
 maintenance:
   # Spare parts are taken out of stock synchronously when a technician books them on a work order.
   inventory-url: ${INVENTORY_SERVICE_URL:http://localhost:8086}
+  # Preventive maintenance plans (docs/adr/0012): how often the planner looks for plans that are due.
+  plans:
+    check-every: ${PLAN_CHECK_EVERY:PT1M}
 
 management:
   endpoints:

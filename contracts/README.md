@@ -56,5 +56,9 @@ The rule is the usual one for events: **add, never change in place**.
 | Add an enum value | consumers first | add it to the consumers (or make them read a string), then to the schema and the producer |
 | Rename or remove a field, change a type | no | add the new field next to the old one, move every consumer, then remove the old one |
 
+Example: in phase 12 the work-order event got an optional `planId` (the maintenance plan the work order comes
+from). It was added to the schema without `required`, the producer sends it, and the consumers' tests read the
+new example `examples/factorymind.maintenance.work-orders/3.json` without any change on their side.
+
 The tests turn each row into a build failure on the side that would break: a producer that sends a value the
 schema does not allow, or a consumer that cannot read what the schema allows.

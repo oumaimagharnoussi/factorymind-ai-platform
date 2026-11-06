@@ -1,0 +1,95 @@
+<header class="page-header">
+  <div>
+    <h1>Maintenance plans</h1>
+    <p class="subtitle">
+      Preventive jobs repeated on each machine. The planner opens their work orders a few days before they are due.
+    </p>
+  </div>
+  @if (auth.hasAnyRole('ADMIN', 'ENGINEER')) {
+    <a mat-flat-button routerLink="/maintenance/plans/new">
+      <mat-icon>add</mat-icon>
+      New plan
+    </a>
+  }
+</header>
+
+@if (plans.hasValue()) {
+  <section class="counters">
+    <div class="counter"><strong>{{ counts().active }}</strong> active plans</div>
+    <div class="counter"><strong>{{ counts().jobsOpen }}</strong> jobs open</div>
+    <div class="counter warn" matTooltip="Work orders of a plan past their due date">
+      <strong>{{ counts().overdue }}</strong> overdue
+    </div>
+    <div class="counter"><strong>{{ counts().next7Days }}</strong> opening in the next 7 days</div>
+  </section>
+}
+
+<div class="filters">
+  <mat-button-toggle-group [value]="view()" (change)="view.set($event.value)" aria-label="Plans to show">
+    <mat-button-toggle value="active">Active</mat-button-toggle>
+    <mat-button-toggle value="all">All, with paused</mat-button-toggle>
+  </mat-button-toggle-group>
+</div>
+
+<div class="table-card">
+  @if (plans.isLoading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <table mat-table [dataSource]="shown()">
+    <ng-container matColumnDef="code">
+      <th mat-header-cell *matHeaderCellDef>Plan</th>
+      <td mat-cell *matCellDef="let p"><strong>{{ p.code }}</strong></td>
+    </ng-container>
+    <ng-container matColumnDef="machine">
+      <th mat-header-cell *matHeaderCellDef>Machine</th>
+      <td mat-cell *matCellDef="let p">
+        {{ assets.code(p.assetId) }}
+        <div class="secondary">{{ assets.name(p.assetId) }}</div>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="title">
+      <th mat-header-cell *matHeaderCellDef>Job</th>
+      <td mat-cell *matCellDef="let p">
+        {{ p.title }}
+        <div class="secondary">{{ scheduleLabel(p) }}{{ p.assignee ? ' · ' + p.assignee : '' }}</div>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="next">
+      <th mat-header-cell *matHeaderCellDef>Next due</th>
+      <td mat-cell *matCellDef="let p">
+        {{ p.nextDueDate | date: 'mediumDate' }}
+        <div class="secondary">{{ stateText(p) }}</div>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="state">
+      <th mat-header-cell *matHeaderCellDef>State</th>
+      <td mat-cell *matCellDef="let p"><app-status-chip [value]="p.state" /></td>
+    </ng-container>
+    <ng-container matColumnDef="job">
+      <th mat-header-cell *matHeaderCellDef>Current work order</th>
+      <td mat-cell *matCellDef="let p">
+        @if (p.currentJob; as job) {
+          <a [routerLink]="['/maintenance/orders', job.id]" (click)="$event.stopPropagation()">{{ job.code }}</a>
+          <div class="secondary" [class.overdue]="job.overdue">
+            {{ job.overdue ? 'overdue since' : 'due' }} {{ job.dueDate | date: 'mediumDate' }}
+          </div>
+        } @else {
+          —
+        }
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="columns"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns" class="clickable" [routerLink]="['/maintenance/plans', row.id]"></tr>
+    <tr class="mat-row" *matNoDataRow>
+      <td class="empty" [attr.colspan]="columns.length">
+        @if (plans.error()) {
+          Maintenance plans could not be loaded.
+        } @else if (!plans.isLoading()) {
+          No maintenance plan yet.
+        }
+      </td>
+    </tr>
+  </table>
+</div>

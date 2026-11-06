@@ -37,12 +37,14 @@ export class StatusChip {
       case 'RECEIPT':
       case 'RETURN':
       case 'SENT':
+      case 'SCHEDULED':
         return 'chip ok';
       case 'WARNING':
       case 'HIGH':
       case 'ON_HOLD':
       case 'LOW_STOCK':
       case 'ACKNOWLEDGED':
+      case 'DUE':
         return 'chip warn';
       case 'STOPPED':
       case 'CRITICAL':
@@ -57,6 +59,7 @@ export class StatusChip {
       case 'ISSUE':
       case 'INFO':
       case 'PENDING':
+      case 'JOB_OPEN':
         return 'chip info';
       default:
         return 'chip muted';

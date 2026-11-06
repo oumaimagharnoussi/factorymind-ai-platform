@@ -18,7 +18,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Business metrics of the maintenance service, scraped by Prometheus from /actuator/prometheus:
  * <ul>
  *   <li>{@code factorymind_workorders_created_total{type,priority,origin}}: origin ALERT (critical alarm),
- *       AI_PREDICTION (failure-risk model) or USER, which shows how much work the prediction plans ahead;</li>
+ *       AI_PREDICTION (failure-risk model), PLAN (preventive maintenance plan) or USER, which shows how much
+ *       work is planned ahead rather than done after a failure;</li>
  *   <li>{@code factorymind_workorders_closed_total{status}}: completed or cancelled;</li>
  *   <li>{@code factorymind_workorders{status}} and {@code factorymind_workorders_overdue}: the backlog now.</li>
  * </ul>
@@ -88,6 +89,9 @@ public class WorkOrderMetrics {
         }
         if (WorkOrderService.AI_INSIGHTS.equals(actor)) {
             return "AI_PREDICTION";
+        }
+        if (WorkOrderService.PLANNER.equals(actor)) {
+            return "PLAN";
         }
         return "USER";
     }

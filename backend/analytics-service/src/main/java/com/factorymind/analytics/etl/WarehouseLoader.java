@@ -31,9 +31,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class WarehouseLoader {
 
-    /** Work orders opened by alert-service (critical alert) and ai-insights-service (HIGH risk). */
+    /**
+     * Work orders opened by alert-service (critical alert), ai-insights-service (HIGH risk) and the preventive
+     * maintenance planner of maintenance-service.
+     */
     static final String ALERT_SERVICE = "alert-service";
     static final String AI_INSIGHTS = "ai-insights";
+    static final String PLANNER = "maintenance-planner";
 
     static final String TELEMETRY_WATERMARK = "telemetry";
     static final String RISK_WATERMARK = "risk";
@@ -206,7 +210,8 @@ public class WarehouseLoader {
                                     WHEN o.requested_by = :ai THEN 5 ELSE 6 END,
                                dw.date_key(o.created_at), dw.date_key(o.completed_at),
                                o.type, CASE WHEN o.type = 'CORRECTIVE' THEN 'CORRECTIVE' ELSE 'PLANNED' END,
-                               CASE o.requested_by WHEN :alert THEN 'ALERT' WHEN :ai THEN 'AI' ELSE 'MANUAL' END,
+                               CASE o.requested_by WHEN :alert THEN 'ALERT' WHEN :ai THEN 'AI' WHEN :planner THEN 'PLAN'
+                                    ELSE 'MANUAL' END,
                                o.priority, o.status, o.failed_at, o.created_at, o.started_at, o.completed_at,
                                dw.hours(o.started_at - coalesce(o.failed_at, o.created_at)),
                                dw.hours(o.completed_at - o.started_at),
@@ -220,7 +225,7 @@ public class WarehouseLoader {
                         JOIN dw.dim_asset a ON a.asset_id = o.asset_id
                         LEFT JOIN dw.dim_technician t ON t.username = o.assignee
                         LEFT JOIN dw.dim_failure_type ft ON ft.sensor_type = o.failure_sensor""")
-                .param("ai", AI_INSIGHTS).param("alert", ALERT_SERVICE)
+                .param("ai", AI_INSIGHTS).param("alert", ALERT_SERVICE).param("planner", PLANNER)
                 .param("rate", properties.laborRatePerHour())
                 .update();
     }

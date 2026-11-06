@@ -70,6 +70,28 @@ export const routes: Routes = [
           import('./features/maintenance/work-order-detail').then((m) => m.WorkOrderDetail),
       },
       {
+        path: 'maintenance/plans',
+        title: 'Maintenance plans · FactoryMind AI',
+        loadComponent: () => import('./features/maintenance/plan-list').then((m) => m.PlanList),
+      },
+      {
+        path: 'maintenance/plans/new',
+        title: 'New maintenance plan · FactoryMind AI',
+        canActivate: [roleGuard('ADMIN', 'ENGINEER')],
+        loadComponent: () => import('./features/maintenance/plan-form').then((m) => m.PlanForm),
+      },
+      {
+        path: 'maintenance/plans/:id',
+        title: 'Maintenance plan · FactoryMind AI',
+        loadComponent: () => import('./features/maintenance/plan-detail').then((m) => m.PlanDetail),
+      },
+      {
+        path: 'maintenance/plans/:id/edit',
+        title: 'Edit maintenance plan · FactoryMind AI',
+        canActivate: [roleGuard('ADMIN', 'ENGINEER')],
+        loadComponent: () => import('./features/maintenance/plan-form').then((m) => m.PlanForm),
+      },
+      {
         path: 'inventory',
         title: 'Spare parts · FactoryMind AI',
         loadComponent: () => import('./features/inventory/part-list').then((m) => m.PartList),

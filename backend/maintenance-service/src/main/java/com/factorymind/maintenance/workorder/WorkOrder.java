@@ -77,6 +77,10 @@ public class WorkOrder extends BaseEntity {
     @Column(name = "requested_by", nullable = false, length = 100)
     private String requestedBy;
 
+    /** The preventive maintenance plan this job is an occurrence of, if any. */
+    @Column(name = "plan_id", updatable = false)
+    private UUID planId;
+
     @Column(name = "started_at")
     private Instant startedAt;
 
@@ -101,11 +105,19 @@ public class WorkOrder extends BaseEntity {
     public WorkOrder(String code, UUID assetId, UUID alertId, WorkOrderType type, WorkOrderPriority priority,
                      String title, String description, String assignee, LocalDate dueDate, String requestedBy,
                      Instant now) {
+        this(code, assetId, alertId, null, type, priority, title, description, assignee, dueDate, requestedBy,
+                alertId == null ? "Work order created" : "Work order created for an alert", now);
+    }
+
+    private WorkOrder(String code, UUID assetId, UUID alertId, UUID planId, WorkOrderType type,
+                      WorkOrderPriority priority, String title, String description, String assignee, LocalDate dueDate,
+                      String requestedBy, String createdMessage, Instant now) {
         this.code = code;
         this.assetId = assetId;
         if (alertId != null) {
             alertIds.add(alertId);
         }
+        this.planId = planId;
         this.type = type;
         this.priority = priority;
         this.status = WorkOrderStatus.OPEN;
@@ -114,8 +126,15 @@ public class WorkOrder extends BaseEntity {
         this.assignee = blankToNull(assignee);
         this.dueDate = dueDate;
         this.requestedBy = requestedBy;
-        log(ActivityType.CREATED, alertId == null ? "Work order created" : "Work order created for an alert",
-                requestedBy, now);
+        log(ActivityType.CREATED, createdMessage, requestedBy, now);
+    }
+
+    /** One occurrence of a preventive maintenance plan, opened by the planner. */
+    public static WorkOrder forPlan(String code, UUID planId, String planCode, UUID assetId, WorkOrderPriority priority,
+                                    String title, String description, String assignee, LocalDate dueDate,
+                                    String requestedBy, Instant now) {
+        return new WorkOrder(code, assetId, null, planId, WorkOrderType.PREVENTIVE, priority, title, description,
+                assignee, dueDate, requestedBy, "Work order created by maintenance plan " + planCode, now);
     }
 
     /** Another alert on the same machine that this job will take care of too. */
@@ -254,6 +273,10 @@ public class WorkOrder extends BaseEntity {
 
     public String getRequestedBy() {
         return requestedBy;
+    }
+
+    public UUID getPlanId() {
+        return planId;
     }
 
     public Instant getStartedAt() {

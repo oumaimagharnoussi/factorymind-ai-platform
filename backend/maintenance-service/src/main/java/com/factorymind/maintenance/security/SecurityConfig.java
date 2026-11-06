@@ -48,6 +48,11 @@ public class SecurityConfig {
                         .requestMatchers(PATCH, "/api/maintenance/work-orders/*/status").hasAnyRole(ADMIN, ENGINEER)
                         .requestMatchers(POST, "/api/maintenance/work-orders/*/parts").hasAnyRole(ADMIN, ENGINEER)
                         .requestMatchers(DELETE, "/api/maintenance/work-orders/*/parts/*").hasAnyRole(ADMIN, ENGINEER)
+                        // Preventive maintenance plans: everyone sees them, engineers plan them.
+                        .requestMatchers(POST, "/api/maintenance/plans", "/api/maintenance/plans/*/pause",
+                                "/api/maintenance/plans/*/resume", "/api/maintenance/plans/*/work-orders")
+                        .hasAnyRole(ADMIN, ENGINEER)
+                        .requestMatchers(PUT, "/api/maintenance/plans/*").hasAnyRole(ADMIN, ENGINEER)
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)))
                 .build();

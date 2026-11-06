@@ -24,6 +24,17 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID>, Jpa
 
     boolean existsByAssetIdAndStatusIn(UUID assetId, Collection<WorkOrderStatus> statuses);
 
+    boolean existsByPlanIdAndStatusIn(UUID planId, Collection<WorkOrderStatus> statuses);
+
+    /** The jobs of these maintenance plans that are not closed yet (at most one per plan). */
+    List<WorkOrder> findByPlanIdInAndStatusIn(Collection<UUID> planIds, Collection<WorkOrderStatus> statuses);
+
+    @Query("""
+            select w.planId as planId, max(w.completedAt) as completedAt from WorkOrder w
+            where w.planId in :planIds and w.status = com.factorymind.maintenance.workorder.WorkOrderStatus.COMPLETED
+            group by w.planId""")
+    List<LastCompletion> lastCompletions(Collection<UUID> planIds);
+
     @Query(value = "select nextval('work_order_number_seq')", nativeQuery = true)
     long nextNumber();
 
@@ -35,6 +46,12 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID>, Jpa
     long countByStatusInAndPriority(Collection<WorkOrderStatus> statuses, WorkOrderPriority priority);
 
     List<WorkOrder> findByStatusAndCompletedAtAfter(WorkOrderStatus status, Instant since);
+
+    interface LastCompletion {
+        UUID getPlanId();
+
+        Instant getCompletedAt();
+    }
 
     interface CountByKey {
         Object getKey();

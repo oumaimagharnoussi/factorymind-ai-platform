@@ -239,6 +239,8 @@ export interface WorkOrderSummary {
   dueDate: string | null;
   overdue: boolean;
   requestedBy: string;
+  /** Set when the work order is an occurrence of a preventive maintenance plan. */
+  planId: string | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -289,6 +291,7 @@ export interface WorkOrderQuery {
   statuses?: WorkOrderStatus[];
   priority?: WorkOrderPriority | null;
   assetId?: string | null;
+  planId?: string | null;
   q?: string;
   page?: number;
   size?: number;
@@ -303,6 +306,60 @@ export interface CreateWorkOrderRequest {
   description?: string | null;
   assignee?: string | null;
   dueDate?: string | null;
+}
+
+// Preventive maintenance plans (maintenance-service)
+
+/** FIXED: every N days on the calendar. FLOATING: N days after the last job was closed. */
+export type PlanSchedule = 'FIXED' | 'FLOATING';
+export const PLAN_SCHEDULES: PlanSchedule[] = ['FIXED', 'FLOATING'];
+
+/** PAUSED, JOB_OPEN (waits for its open job), DUE (opened on the planner's next run) or SCHEDULED. */
+export type PlanState = 'PAUSED' | 'JOB_OPEN' | 'DUE' | 'SCHEDULED';
+
+export interface PlanJob {
+  id: string;
+  code: string;
+  status: WorkOrderStatus;
+  dueDate: string | null;
+  overdue: boolean;
+}
+
+export interface MaintenancePlan {
+  id: string;
+  code: string;
+  assetId: string;
+  title: string;
+  instructions: string | null;
+  schedule: PlanSchedule;
+  intervalDays: number;
+  leadDays: number;
+  priority: WorkOrderPriority;
+  assignee: string | null;
+  active: boolean;
+  state: PlanState;
+  nextDueDate: string;
+  /** The day the planner opens the next work order: next due date minus lead days. */
+  opensOn: string;
+  currentJob: PlanJob | null;
+  lastCompletedAt: string | null;
+  lastGeneratedAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface PlanRequest {
+  assetId: string;
+  title: string;
+  instructions: string | null;
+  schedule: PlanSchedule;
+  intervalDays: number;
+  leadDays: number;
+  priority: WorkOrderPriority;
+  assignee: string | null;
+  nextDueDate: string;
 }
 
 // Inventory service

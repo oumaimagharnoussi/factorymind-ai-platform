@@ -14,7 +14,7 @@ final class WorkOrderSpecifications {
     }
 
     record WorkOrderFilter(List<WorkOrderStatus> statuses, WorkOrderPriority priority, WorkOrderType type,
-                           UUID assetId, UUID alertId, String q) {
+                           UUID assetId, UUID alertId, UUID planId, String q) {
     }
 
     static Specification<WorkOrder> matching(WorkOrderFilter filter) {
@@ -24,6 +24,7 @@ final class WorkOrderSpecifications {
                         equalTo("type", filter.type()),
                         equalTo("assetId", filter.assetId()),
                         answers(filter.alertId()),
+                        equalTo("planId", filter.planId()),
                         textMatches(filter.q()))
                 .filter(Objects::nonNull)
                 .toList());

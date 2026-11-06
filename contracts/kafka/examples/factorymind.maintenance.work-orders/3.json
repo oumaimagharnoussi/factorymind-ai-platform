@@ -1,0 +1,15 @@
+{
+  "eventType": "CREATED",
+  "workOrderId": "0b6f5e1d-2c3a-4b7e-9d8f-1a2b3c4d5e6f",
+  "code": "WO-00007",
+  "assetId": "33333333-0000-0000-0000-000000000101",
+  "alertIds": [],
+  "type": "PREVENTIVE",
+  "priority": "MEDIUM",
+  "status": "OPEN",
+  "title": "Lubricate conveyor motor bearings",
+  "assignee": "engineer",
+  "actor": "maintenance-planner",
+  "planId": "77777777-0000-0000-0000-000000000002",
+  "occurredAt": "2026-11-06T14:05:12.031Z"
+}

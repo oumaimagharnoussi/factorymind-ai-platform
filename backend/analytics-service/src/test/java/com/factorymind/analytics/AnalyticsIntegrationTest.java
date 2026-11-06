@@ -142,7 +142,7 @@ class AnalyticsIntegrationTest {
                 ('55555555-0000-0000-0000-000000000011', 'WO-00011', '%2$s', 'CORRECTIVE', 'URGENT', 'OPEN',
                  'Critical vibration', 'alert-service', NULL, NULL, NULL, NULL, '2026-10-30T14:01Z', '2026-10-30T14:01Z'),
                 ('55555555-0000-0000-0000-000000000012', 'WO-00012', '%3$s', 'PREVENTIVE', 'MEDIUM', 'COMPLETED',
-                 'Monthly service', 'engineer', 'engineer', '2026-10-29T22:00Z', '2026-10-30T02:00Z',
+                 'Monthly service', 'maintenance-planner', 'engineer', '2026-10-29T22:00Z', '2026-10-30T02:00Z',
                  'Greased bearings', '2026-10-28T09:00Z', '2026-10-30T02:00Z'),
                 ('55555555-0000-0000-0000-000000000013', 'WO-00013', '%3$s', 'INSPECTION', 'HIGH', 'COMPLETED',
                  'Predicted vibration failure', 'ai-insights', 'engineer', '2026-10-29T09:00Z', '2026-10-29T09:30Z',
@@ -198,6 +198,10 @@ class AnalyticsIntegrationTest {
                         SELECT origin || '/' || failure_type_key FROM dw.fact_maintenance
                         WHERE work_order_code = 'WO-00013'""").query(String.class).single())
                 .isEqualTo("AI/5");
+        assertThat(warehouse.sql("""
+                        SELECT origin || '/' || failure_type_key FROM dw.fact_maintenance
+                        WHERE work_order_code = 'WO-00012'""").query(String.class).single())
+                .isEqualTo("PLAN/6");
 
         // Downtime: the preventive service over midnight counts 2 h on each day; the open order runs until now.
         assertThat(downtime("55555555-0000-0000-0000-000000000012"))

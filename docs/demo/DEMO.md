@@ -64,6 +64,14 @@ Complete the work order: the alert is resolved.
 > "Five services took part, and none of them called another one directly to make it happen. They react to Kafka
 > events: alert → work order → notification → alert resolved."
 
+**Maintenance plans.** Routine servicing does not wait for a failure. M-101's bearing lubrication (PM-00002) was
+due when the stack started, so its PREVENTIVE work order was opened by `maintenance-planner` a minute later and
+assigned to the usual technician. PM-00001 waits for its compressor service to be closed; PM-00005 is paused.
+
+> "A plan is counted on the calendar for legal inspections, or from the last job for wear items. It never has two
+> jobs open: a late job stays red instead of piling up. Several instances can run the planner, because the
+> database refuses a second open job."
+
 ## 5. The numbers for management (1 minute)
 
 **Analytics.** Availability, MTBF, MTTR, maintenance cost, and how well the model predicts failures (precision
@@ -100,5 +108,6 @@ Grafana (http://localhost:3000):
 | How do you avoid duplicate e-mails? | A unique event key per notification (idempotency), a transactional outbox with retries, and a throttle per rule. | [ADR 0009](../adr/0009-notifications-alert-routing.md) |
 | How are services secured? | Keycloak (OIDC with PKCE for the browser, JWT checked in the gateway and again in each service, roles), and client credentials for service-to-service calls. | [ADR 0002](../adr/0002-keycloak-security.md) |
 | How good is the model? | Its model card has the test metrics. In the app, the analytics page compares predictions with what really happened. | [ADR 0005](../adr/0005-ai-insights-ml.md) |
+| How is routine maintenance planned? | Plans per machine, every N days on the calendar or after the last job. The planner opens one PREVENTIVE work order a few days ahead; a unique index keeps one open job per plan even with several instances. | [ADR 0012](../adr/0012-preventive-maintenance-plans.md) |
 | How do services evolve without breaking each other? | Shared contracts tested on both sides: add fields, never change them in place. | [contracts/README.md](../../contracts/README.md) |
-| What would you do next? | Kubernetes with Helm and autoscaling of the telemetry consumers, Schema Registry with Avro if the number of teams grows, preventive maintenance plans, retraining the model on real failure history. | |
+| What would you do next? | Kubernetes with Helm and autoscaling of the telemetry consumers, Schema Registry with Avro if the number of teams grows, maintenance plans by running hours, retraining the model on real failure history. | |

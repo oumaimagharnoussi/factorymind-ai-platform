@@ -48,9 +48,10 @@ public class WorkOrderController {
             @RequestParam(required = false) WorkOrderType type,
             @RequestParam(required = false) UUID assetId,
             @RequestParam(required = false) UUID alertId,
+            @RequestParam(required = false) UUID planId,
             @RequestParam(required = false) String q,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return service.search(new WorkOrderFilter(status, priority, type, assetId, alertId, q), pageable);
+        return service.search(new WorkOrderFilter(status, priority, type, assetId, alertId, planId, q), pageable);
     }
 
     @GetMapping("/summary")

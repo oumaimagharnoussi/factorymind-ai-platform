@@ -1,0 +1,93 @@
+<a mat-button [routerLink]="id() ? ['/maintenance/plans', id()] : ['/maintenance/plans']">
+  <mat-icon>arrow_back</mat-icon>
+  {{ id() ? 'Plan' : 'Maintenance plans' }}
+</a>
+
+<header class="page-header">
+  <div>
+    <h1>{{ id() ? 'Edit maintenance plan' : 'New maintenance plan' }}</h1>
+    <p class="subtitle">A job to repeat on one machine. Each time it is due, a preventive work order is opened.</p>
+  </div>
+</header>
+
+<mat-card>
+  <mat-card-content>
+    @if (loaded()) {
+      <form class="form" [formGroup]="form" (ngSubmit)="save()">
+        <mat-form-field appearance="outline">
+          <mat-label>Machine</mat-label>
+          <mat-select formControlName="assetId">
+            @for (a of assets.list(); track a.id) {
+              <mat-option [value]="a.id">{{ a.assetCode }} {{ a.name }}</mat-option>
+            }
+          </mat-select>
+          @if (id()) {
+            <mat-hint>A plan stays on its machine.</mat-hint>
+          }
+          <mat-error>Choose the machine.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Priority of its work orders</mat-label>
+          <mat-select formControlName="priority">
+            @for (p of priorities; track p) {
+              <mat-option [value]="p">{{ humanize(p) }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>What to do</mat-label>
+          <input matInput formControlName="title" maxlength="160" placeholder="Lubricate drive bearings" />
+          <mat-error>A short title is required.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Instructions for the technician</mat-label>
+          <textarea matInput rows="3" formControlName="instructions" maxlength="2000"></textarea>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Repeat every (days)</mat-label>
+          <input matInput type="number" min="1" max="3650" formControlName="intervalDays" />
+          <mat-error>Between 1 and 3650 days.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Counted</mat-label>
+          <mat-select formControlName="schedule">
+            <mat-option value="FIXED">On the calendar</mat-option>
+            <mat-option value="FLOATING">From the last job</mat-option>
+          </mat-select>
+          <mat-hint>{{ hints[form.controls.schedule.value] }}</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Open the work order (days before)</mat-label>
+          <input matInput type="number" min="0" formControlName="leadDays" />
+          <mat-hint>Time to plan the job and get the parts.</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ id() ? 'Next due date' : 'First due date' }}</mat-label>
+          <input matInput type="date" [min]="today" formControlName="nextDueDate" />
+          <mat-error>Choose a date.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Usual technician (user name)</mat-label>
+          <input matInput formControlName="assignee" maxlength="100" />
+        </mat-form-field>
+
+        @if (form.hasError('leadTooLong') && (form.controls.leadDays.touched || form.controls.intervalDays.touched)) {
+          <p class="form-error wide" role="alert">The work order must open fewer days ahead than the interval.</p>
+        }
+
+        <div class="buttons wide">
+          <button mat-flat-button type="submit" [disabled]="saving()">{{ id() ? 'Save plan' : 'Create plan' }}</button>
+          <a mat-button [routerLink]="id() ? ['/maintenance/plans', id()] : ['/maintenance/plans']">Cancel</a>
+        </div>
+      </form>
+    }
+  </mat-card-content>
+</mat-card>

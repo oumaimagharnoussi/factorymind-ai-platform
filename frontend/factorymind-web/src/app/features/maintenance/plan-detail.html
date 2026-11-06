@@ -1,0 +1,124 @@
+<a mat-button routerLink="/maintenance/plans" class="back">
+  <mat-icon>arrow_back</mat-icon>
+  Maintenance plans
+</a>
+
+@if (plan.isLoading() && !plan.hasValue()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+@if (plan.error()) {
+  <div class="error-banner" role="alert">This maintenance plan could not be loaded.</div>
+}
+
+@if (plan.value(); as p) {
+  <header class="page-header">
+    <div>
+      <h1>{{ p.code }} · {{ p.title }}</h1>
+      <p class="subtitle">
+        <a [routerLink]="['/assets', p.assetId]">{{ assets.code(p.assetId) }} {{ assets.name(p.assetId) }}</a>
+        · {{ scheduleLabel(p) }}
+      </p>
+    </div>
+    <div class="chips">
+      <app-status-chip [value]="p.priority" />
+      <app-status-chip [value]="p.state" />
+    </div>
+  </header>
+
+  @if (auth.hasAnyRole('ADMIN', 'ENGINEER')) {
+    <div class="actions">
+      @if (p.active && !p.currentJob) {
+        <button mat-stroked-button class="primary" [disabled]="busy()" (click)="openNow()">
+          <mat-icon>playlist_add</mat-icon>
+          Open the work order now
+        </button>
+      }
+      @if (p.active) {
+        <button mat-stroked-button [disabled]="busy()" (click)="pause()">
+          <mat-icon>pause</mat-icon>
+          Pause plan
+        </button>
+      } @else {
+        <button mat-stroked-button [disabled]="busy()" (click)="resume()">
+          <mat-icon>play_arrow</mat-icon>
+          Resume plan
+        </button>
+      }
+      <a mat-stroked-button [routerLink]="['/maintenance/plans', p.id, 'edit']">
+        <mat-icon>edit</mat-icon>
+        Edit
+      </a>
+    </div>
+  }
+
+  <section class="grid">
+    <mat-card>
+      <mat-card-header><mat-card-title>Next occurrence</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <p>{{ stateText(p) }}.</p>
+        <dl class="facts">
+          <dt>Next due</dt>
+          <dd>{{ p.nextDueDate | date: 'mediumDate' }}</dd>
+          <dt>Work order</dt>
+          <dd>
+            @if (p.currentJob; as job) {
+              <a [routerLink]="['/maintenance/orders', job.id]">{{ job.code }}</a>
+              · {{ humanize(job.status) }}
+              <span [class.overdue]="job.overdue">
+                · {{ job.overdue ? 'overdue since' : 'due' }} {{ job.dueDate | date: 'mediumDate' }}
+              </span>
+            } @else {
+              opens on {{ p.opensOn | date: 'mediumDate' }}, {{ p.leadDays }} day(s) before it is due
+            }
+          </dd>
+          <dt>Technician</dt>
+          <dd>{{ p.assignee ?? 'not assigned' }}</dd>
+          <dt>Last done</dt>
+          <dd>{{ p.lastCompletedAt ? (p.lastCompletedAt | date: 'mediumDate') : 'never' }}</dd>
+        </dl>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header><mat-card-title>Instructions</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <p class="description">{{ p.instructions ?? 'No instructions written.' }}</p>
+        <dl class="facts">
+          <dt>Repeats</dt>
+          <dd>{{ scheduleLabel(p) }}</dd>
+          <dt>Created</dt>
+          <dd>{{ p.createdAt | date: 'mediumDate' }} by {{ p.createdBy }}</dd>
+        </dl>
+      </mat-card-content>
+    </mat-card>
+  </section>
+
+  <mat-card>
+    <mat-card-header><mat-card-title>Work orders of this plan</mat-card-title></mat-card-header>
+    <mat-card-content>
+      <table mat-table [dataSource]="history.value()?.content ?? []">
+        <ng-container matColumnDef="code">
+          <th mat-header-cell *matHeaderCellDef>Work order</th>
+          <td mat-cell *matCellDef="let w"><strong>{{ w.code }}</strong></td>
+        </ng-container>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let w"><app-status-chip [value]="w.status" /></td>
+        </ng-container>
+        <ng-container matColumnDef="due">
+          <th mat-header-cell *matHeaderCellDef>Due</th>
+          <td mat-cell *matCellDef="let w" [class.overdue]="w.overdue">{{ w.dueDate | date: 'mediumDate' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="completed">
+          <th mat-header-cell *matHeaderCellDef>Completed</th>
+          <td mat-cell *matCellDef="let w">{{ w.completedAt ? (w.completedAt | date: 'mediumDate') : '—' }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="historyColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: historyColumns" class="clickable" [routerLink]="['/maintenance/orders', row.id]"></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="empty" [attr.colspan]="historyColumns.length">No work order opened yet.</td>
+        </tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
+}

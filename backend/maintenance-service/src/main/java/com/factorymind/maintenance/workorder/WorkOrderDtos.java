@@ -60,13 +60,14 @@ public final class WorkOrderDtos {
             LocalDate dueDate,
             boolean overdue,
             String requestedBy,
+            UUID planId,
             Instant createdAt,
             Instant completedAt) {
 
-        static WorkOrderSummary of(WorkOrder w, LocalDate today) {
+        public static WorkOrderSummary of(WorkOrder w, LocalDate today) {
             return new WorkOrderSummary(w.getId(), w.getCode(), w.getAssetId(), Set.copyOf(w.getAlertIds()), w.getType(),
                     w.getPriority(), w.getStatus(), w.getTitle(), w.getAssignee(), w.getDueDate(), w.isOverdue(today),
-                    w.getRequestedBy(), w.getCreatedAt(), w.getCompletedAt());
+                    w.getRequestedBy(), w.getPlanId(), w.getCreatedAt(), w.getCompletedAt());
         }
     }
 
@@ -102,6 +103,7 @@ public final class WorkOrderDtos {
             LocalDate dueDate,
             boolean overdue,
             String requestedBy,
+            UUID planId,
             Instant createdAt,
             Instant updatedAt,
             Instant startedAt,
@@ -115,8 +117,8 @@ public final class WorkOrderDtos {
         static WorkOrderResponse of(WorkOrder w, LocalDate today) {
             return new WorkOrderResponse(w.getId(), w.getCode(), w.getAssetId(), Set.copyOf(w.getAlertIds()), w.getType(),
                     w.getPriority(), w.getStatus(), w.getStatus().next(), w.getTitle(), w.getDescription(),
-                    w.getAssignee(), w.getDueDate(), w.isOverdue(today), w.getRequestedBy(), w.getCreatedAt(),
-                    w.getUpdatedAt(), w.getStartedAt(), w.getCompletedAt(), w.getResolution(),
+                    w.getAssignee(), w.getDueDate(), w.isOverdue(today), w.getRequestedBy(), w.getPlanId(),
+                    w.getCreatedAt(), w.getUpdatedAt(), w.getStartedAt(), w.getCompletedAt(), w.getResolution(),
                     w.getParts().stream().map(PartLine::of).toList(), w.partsCost(),
                     w.getActivities().stream().map(Activity::of).toList(), w.getVersion());
         }

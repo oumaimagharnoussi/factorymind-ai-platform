@@ -3,6 +3,7 @@ package com.factorymind.maintenance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
@@ -16,12 +17,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.factorymind.maintenance.alert.AlertListener;
 import com.factorymind.maintenance.inventory.InventoryClient;
 import com.factorymind.maintenance.inventory.IssuedStock;
+import com.factorymind.maintenance.plan.MaintenancePlanner;
 import com.factorymind.maintenance.risk.RiskLevelListener;
 import com.factorymind.maintenance.workorder.MaintenanceTopics;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +79,9 @@ class MaintenanceIntegrationTest {
 
     @MockitoBean
     InventoryClient inventory;
+
+    @Autowired
+    MaintenancePlanner planner;
 
     /** Owned by alert-service and ai-insights-service in real life; this test plays them. */
     @TestConfiguration
@@ -168,6 +175,93 @@ class MaintenanceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.byStatus.ON_HOLD").value(1))
                 .andExpect(jsonPath("$.mttrHours").isNumber());
+    }
+
+    @Test
+    void aFixedPlanOpensOnePreventiveWorkOrderInTimeAndKeepsItsCalendar() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        String planId = JsonPath.read(mvc.perform(post("/api/maintenance/plans").with(engineer)
+                        .contentType(MediaType.APPLICATION_JSON).content(plan(assetId, "FIXED", today.plusDays(2))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(matchesPattern("PM-\\d{5}")))
+                .andExpect(jsonPath("$.state").value("DUE"))
+                .andExpect(jsonPath("$.opensOn").value(today.minusDays(1).toString()))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        planner.openDueWorkOrders();
+        planner.openDueWorkOrders(); // the next run finds the job already open
+
+        mvc.perform(get("/api/maintenance/work-orders").param("planId", planId).with(engineer))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].type").value("PREVENTIVE"))
+                .andExpect(jsonPath("$.content[0].requestedBy").value("maintenance-planner"))
+                .andExpect(jsonPath("$.content[0].assignee").value("engineer"))
+                .andExpect(jsonPath("$.content[0].dueDate").value(today.plusDays(2).toString()));
+        String workOrderId = JsonPath.read(mvc.perform(get("/api/maintenance/plans/{id}", planId).with(engineer))
+                .andExpect(jsonPath("$.state").value("JOB_OPEN"))
+                .andExpect(jsonPath("$.nextDueDate").value(today.plusDays(32).toString()))
+                .andReturn().getResponse().getContentAsString(), "$.currentJob.id");
+        mvc.perform(get("/api/maintenance/work-orders/{id}", workOrderId).with(engineer))
+                .andExpect(jsonPath("$.planId").value(planId))
+                .andExpect(jsonPath("$.activities[0].message").value(matchesPattern(
+                        "Work order created by maintenance plan PM-\\d{5}")));
+
+        changeStatus(workOrderId, "IN_PROGRESS", null).andExpect(status().isOk());
+        changeStatus(workOrderId, "COMPLETED", "Both bearings greased, no noise").andExpect(status().isOk());
+        mvc.perform(get("/api/maintenance/plans/{id}", planId).with(engineer))
+                .andExpect(jsonPath("$.state").value("SCHEDULED"))
+                .andExpect(jsonPath("$.currentJob").doesNotExist())
+                .andExpect(jsonPath("$.lastCompletedAt").value(notNullValue()))
+                .andExpect(jsonPath("$.nextDueDate").value(today.plusDays(32).toString()));
+
+        // Opened early by hand, the job is due today; a second open job is refused.
+        mvc.perform(post("/api/maintenance/plans/{id}/work-orders", planId).with(engineer))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.dueDate").value(today.toString()));
+        mvc.perform(post("/api/maintenance/plans/{id}/work-orders", planId).with(engineer))
+                .andExpect(status().isConflict());
+        assertThat(workOrderEvents(assetId)).containsSubsequence("CREATED", "STATUS_CHANGED", "STATUS_CHANGED",
+                "CREATED");
+    }
+
+    @Test
+    void aFloatingPlanCountsTheIntervalFromTheLastJob() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        String planId = JsonPath.read(mvc.perform(post("/api/maintenance/plans").with(engineer)
+                        .contentType(MediaType.APPLICATION_JSON).content(plan(assetId, "FLOATING", today)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        planner.openDueWorkOrders();
+        String workOrderId = JsonPath.read(mvc.perform(get("/api/maintenance/plans/{id}", planId).with(engineer))
+                .andExpect(jsonPath("$.nextDueDate").value(today.toString()))
+                .andReturn().getResponse().getContentAsString(), "$.currentJob.id");
+        changeStatus(workOrderId, "CANCELLED", "Machine sold").andExpect(status().isOk());
+
+        mvc.perform(get("/api/maintenance/plans/{id}", planId).with(engineer))
+                .andExpect(jsonPath("$.nextDueDate").value(today.plusDays(30).toString()));
+        mvc.perform(post("/api/maintenance/plans/{id}/pause", planId).with(engineer))
+                .andExpect(jsonPath("$.state").value("PAUSED"));
+    }
+
+    @Test
+    void theDemoPlansShowEachState() throws Exception {
+        planner.openDueWorkOrders();
+
+        mvc.perform(get("/api/maintenance/plans").with(engineer))
+                .andExpect(jsonPath("$[?(@.code == 'PM-00001')].currentJob.code").value("WO-00001"))
+                .andExpect(jsonPath("$[?(@.code == 'PM-00002')].state").value("JOB_OPEN"))
+                .andExpect(jsonPath("$[?(@.code == 'PM-00003')].state").value("SCHEDULED"))
+                .andExpect(jsonPath("$[?(@.code == 'PM-00005')].state").value("PAUSED"));
+    }
+
+    private static String plan(UUID assetId, String schedule, LocalDate dueDate) {
+        return """
+                {"assetId": "%s", "title": "Grease conveyor bearings", "instructions": "8 g each side",
+                 "schedule": "%s", "intervalDays": 30, "leadDays": 3, "priority": "MEDIUM", "assignee": "engineer",
+                 "nextDueDate": "%s"}""".formatted(assetId, schedule, dueDate);
     }
 
     private static String criticalAlert(UUID alertId, UUID assetId, String sensorType) {

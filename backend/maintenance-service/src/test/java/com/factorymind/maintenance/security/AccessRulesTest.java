@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.factorymind.maintenance.plan.PlanController;
+import com.factorymind.maintenance.plan.PlanService;
 import com.factorymind.maintenance.workorder.WorkOrderController;
 import com.factorymind.maintenance.workorder.WorkOrderService;
 import java.util.UUID;
@@ -23,7 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** The role matrix from {@link SecurityConfig}, checked through the real filter chain. */
-@WebMvcTest(WorkOrderController.class)
+@WebMvcTest({WorkOrderController.class, PlanController.class})
 @Import(SecurityConfig.class)
 class AccessRulesTest {
 
@@ -32,6 +34,9 @@ class AccessRulesTest {
 
     @MockitoBean
     WorkOrderService workOrders;
+
+    @MockitoBean
+    PlanService plans;
 
     @MockitoBean
     JwtDecoder jwtDecoder;
@@ -72,6 +77,27 @@ class AccessRulesTest {
                 .andExpect(status().isOk());
         mvc.perform(delete("/api/maintenance/work-orders/{id}/parts/{line}", id, UUID.randomUUID()).with(as("ENGINEER")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void everyoneSeesThePlansButOnlyEngineersPlan() throws Exception {
+        mvc.perform(get("/api/maintenance/plans").with(as("OPERATOR"))).andExpect(status().isOk());
+        mvc.perform(post("/api/maintenance/plans").with(as("OPERATOR"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/maintenance/plans/{id}/work-orders", id).with(as("OPERATOR")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/maintenance/plans/{id}/pause", id).with(as("OPERATOR")))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(post("/api/maintenance/plans").with(as("ENGINEER"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/maintenance/plans/{id}/resume", id).with(as("ENGINEER"))).andExpect(status().isOk());
+        mvc.perform(put("/api/maintenance/plans/{id}", id).with(as("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(delete("/api/maintenance/plans/{id}", id).with(as("ADMIN"))).andExpect(status().isForbidden());
     }
 
     @Test

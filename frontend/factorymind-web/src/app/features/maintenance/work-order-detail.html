@@ -91,6 +91,10 @@
           <dd>{{ w.startedAt ? (w.startedAt | date: 'medium') : '—' }}</dd>
           <dt>Completed</dt>
           <dd>{{ w.completedAt ? (w.completedAt | date: 'medium') : '—' }}</dd>
+          @if (w.planId) {
+            <dt>Plan</dt>
+            <dd><a [routerLink]="['/maintenance/plans', w.planId]">Preventive maintenance plan</a></dd>
+          }
           @if (w.alertIds.length) {
             <dt>Alerts</dt>
             <dd>

@@ -953,7 +953,7 @@
     {
       "type": "timeseries",
       "title": "Work orders opened, by origin",
-      "description": "Who asked for the work: a critical ALERT, the AI_PREDICTION (before the failure) or a USER",
+      "description": "Who asked for the work: a critical ALERT, the AI_PREDICTION (before the failure), a preventive maintenance PLAN or a USER",
       "targets": [
         {
           "refId": "A",
@@ -1026,6 +1026,21 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PLAN"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
                 }
               }
             ]
